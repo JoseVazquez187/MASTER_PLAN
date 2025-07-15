@@ -20,7 +20,7 @@ from PyQt5.QtGui import QFont
 
 # Importar configuración
 try:
-    from R4Database.config_tables import (TABLES_CONFIG, BASE_PATHS, get_all_tables, 
+    from config_tables import (TABLES_CONFIG, BASE_PATHS, get_all_tables, 
                             read_file_data, detect_column_format, 
                             process_dataframe_columns)
     print(f"✅ Configuración cargada: {len(TABLES_CONFIG)} tablas disponibles")

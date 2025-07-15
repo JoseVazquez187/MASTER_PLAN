@@ -727,6 +727,52 @@ TABLES_CONFIG = {
         )"""
     },
 
+    # ==================== TABLA SAFETY_STOCK ====================
+    "safety_stock": {
+        "source_file": r"J:\Departments\Material Control\Purchasing\Tools\ComprasDB\safety_stock.txt",
+        "table_name": "safety_stock",
+        "file_type": "fixed_width",
+        "fixed_width_params": {
+            "widths": [9, 32, 30, 4, 13, 13, 13, 6, 9, 100],
+            "header": 3,
+            "skip_rows": [0]
+        },
+        "data_filters": {
+            "exclude_rows": {"Ent-Group": "End-of-Re"}
+        },
+        "columns_mapping": {
+            'Item-No': 'ItemNo',
+            'Safety-Stock': 'Qty'
+        },
+        "columns_order_original": [
+            'Ent-Group', 'Item-No', 'Description', 'UM', 'Plan-Type', 'OnHand', 'Safety-Stock', 'Reorder', 'Order-Q'
+        ],
+        "columns_order_renamed": [
+            'Ent_Group', 'ItemNo', 'Description', 'UM', 'Plan_Type', 'OnHand', 'Qty', 'Reorder', 'Order_Q'
+        ],
+        "create_table_sql": """CREATE TABLE IF NOT EXISTS safety_stock(
+            ItemNo TEXT,
+            Qty TEXT
+        )"""
+    },
+
+    # ==================== TABLA SAFETY_STOCK_SHOULD_BE ====================
+    "safety_stock_should_be": {
+        "source_file": "dynamic_file_selection",
+        "table_name": "safety_stock_should_be",
+        "file_type": "excel",
+        "columns_order_original": [
+            'ItemNo', 'New_Qty'
+        ],
+        "columns_order_renamed": [
+            'ItemNo', 'New_Qty'
+        ],
+        "create_table_sql": """CREATE TABLE IF NOT EXISTS safety_stock_should_be(
+            ItemNo TEXT,
+            New_Qty TEXT
+        )"""
+    },
+
     # ==================== TABLA OH_PR_TABLE ====================
     "oh_pr_table": {
         "source_file": r"J:\Departments\Material Control\Purchasing\Tools\ComprasDB\ohNeteable.xlsx",
@@ -773,49 +819,55 @@ TABLES_CONFIG = {
         "table_name": "fcst",
         "file_type": "fixed_width",
         "fixed_width_params": {
-            "widths": [9, 5, 9, 23, 7, 7, 24, 17, 4, 3, 8, 9, 10, 10, 10, 3, 2, 30],
+            "widths": [9, 5, 9, 30, 7, 24, 17, 4, 3, 8, 9, 10, 10, 10, 3, 2, 30],
             "header": 3,
             "skip_rows": [0],
             "drop_last_row": True
         },
         "columns_mapping": {
             'A/C-No': 'AC',
-            'Config-ID            CR': 'ConfigID',
-            'st  Ite': 'FcstNO',
+            'Config-ID            CRev   Fc': 'ConfigID',
+            'st  Ite': 'FcstNo',
             'm-No                 Des': 'ItemNo',
+            'UM': 'Rev',
+            'Pla': 'UM',
             'cription      Rev': 'Description',
-            'Pla': 'PlannedBy',
+            'nned-By': 'PlannedBy',
+            'Rqmt-Date': 'ReqDate',
             'Qty-Fcst': 'QtyFcst',
-            'Opn-Qty': 'OpnQty',
-            'WO          SO-AC': 'WO',
-            'Rqmt-Date': 'ReqDate'
+            'Opn-Qty': 'OpenQty',
+            'WO          SO-AC': 'WO'
         },
         "columns_order_original": [
-            'Entity', 'A/C-No', 'Config-ID            CR', 'st  Ite', 'm-No                 Des',
-            'cription      Rev', 'Pla', 'Qty-Fcst', 'Opn-Qty', 'WO          SO-AC', 'Rqmt-Date'
+            'Entity', 'Proj', 'A/C-No', 'Config-ID            CRev   Fc', 'st  Ite', 'm-No                 Des',
+            'UM', 'Pla', 'cription      Rev', 'nned-By', 'Rqmt-Date', 'Qty-Fcst', 'Opn-Qty', 'WO          SO-AC'
         ],
         "columns_order_renamed": [
-            'Entity', 'AC', 'PlannedBy', 'ConfigID', 'FcstNO',
-            'ReqDate', 'ItemNo', 'Description', 'QtyFcst', 'OpnQty'
+            'Entity', 'Proj', 'AC', 'ConfigID', 'FcstNo', 'Description', 'ItemNo',
+            'Rev', 'UM', 'PlannedBy', 'ReqDate', 'QtyFcst', 'OpenQty', 'WO'
         ],
         "special_processing": {
             "clear_before_insert": True,
             "has_control_table": True,
             "custom_cleaning": True,
-            "numeric_columns": ["QtyFcst", "OpnQty"],
+            "numeric_columns": ["QtyFcst", "OpenQty"],
             "final_columns_only": True
         },
         "create_table_sql": """CREATE TABLE IF NOT EXISTS fcst(
             Entity TEXT,
+            Proj TEXT,
             AC TEXT,
-            PlannedBy TEXT,
             ConfigID TEXT,
-            FcstNO TEXT,
-            ReqDate TEXT,
-            ItemNo TEXT,
+            FcstNo TEXT,
             Description TEXT,
+            ItemNo TEXT,
+            Rev TEXT,
+            UM TEXT,
+            PlannedBy TEXT,
+            ReqDate TEXT,
             QtyFcst INTEGER,
-            OpnQty INTEGER
+            OpenQty INTEGER,
+            WO TEXT
         )""",
         "control_table": {
             "table_name": "fcst_loaded",
