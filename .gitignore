@@ -1,0 +1,52 @@
+# Entorno virtual
+myenv/
+env/
+.venv/
+venv/
+
+# Bytecode de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos de logs y bases de datos
+*.log
+*.sqlite3
+*.db
+
+# Archivos de configuración local
+*.env
+.env.*
+.settings/
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de compilación
+build/
+dist/
+*.egg-info/
+
+# Archivos de Jupyter
+.ipynb_checkpoints/
+
+# Archivos temporales
+*.bak
+*.tmp
+*.swp
+
+# Archivos exportados o convertidos
+*.xlsx
+*.xls
+*.csv
+
+# Otros
+*.pkl
+*.h5
