@@ -734,31 +734,32 @@ TABLES_CONFIG = {
         "file_type": "fixed_width",
         "fixed_width_params": {
             "widths": [9, 32, 30, 4, 13, 13, 13, 6, 9, 100],
-            "header": 3,
-            "skip_rows": [0]
+            "header": 3
         },
         "data_filters": {
-            "exclude_rows": {"Ent-Group": "End-of-Re"}
+            "remove_index_0_if_dash_in": "Item-No"
         },
         "columns_mapping": {
-            'Item-No': 'ItemNo',
-            'Safety-Stock': 'Qty'
+            "Item-No": "ItemNo",
+            "Safety-Stock": "Qty"
         },
         "columns_order_original": [
-            'Ent-Group', 'Item-No', 'Description', 'UM', 'Plan-Type', 'OnHand', 'Safety-Stock', 'Reorder', 'Order-Q'
+            "Item-No", "Safety-Stock"
         ],
         "columns_order_renamed": [
-            'Ent_Group', 'ItemNo', 'Description', 'UM', 'Plan_Type', 'OnHand', 'Qty', 'Reorder', 'Order_Q'
+            "ItemNo", "Qty"
         ],
-        "create_table_sql": """CREATE TABLE IF NOT EXISTS safety_stock(
-            ItemNo TEXT,
-            Qty TEXT
-        )"""
-    },
+        "create_table_sql": """
+            CREATE TABLE IF NOT EXISTS safety_stock (
+                ItemNo TEXT,
+                Qty TEXT
+            )
+        """
+},
 
     # ==================== TABLA SAFETY_STOCK_SHOULD_BE ====================
     "safety_stock_should_be": {
-        "source_file": "dynamic_file_selection",
+        "source_file":  r"J:\Departments\Material Control\Purchasing\Tools\ComprasDB\safety_stock_should_be.xlsx",
         "table_name": "safety_stock_should_be",
         "file_type": "excel",
         "columns_order_original": [

@@ -9,7 +9,7 @@ def simple_wo_kiteo():
     db_path = r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"
     desktop = os.path.join(os.path.expanduser("~"), "Desktop")
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    output_file = os.path.join(desktop, f"Propuesta_Kiteo_{timestamp}.xlsx")
+    output_file = os.path.join(desktop, f"GRUPOS_KITEO.xlsx")
 
     try:
         print("📊 Conectando a la base de datos...")
