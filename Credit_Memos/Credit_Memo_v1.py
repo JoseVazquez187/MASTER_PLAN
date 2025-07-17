@@ -1,16 +1,16 @@
 import flet as ft
 import pandas as pd
 import sqlite3
-import plotly.express as px
-import plotly.graph_objects as go
+import datetime as dt
+import os
 from datetime import datetime, timedelta
-import json
-from typing import Dict, List, Optional
 
-class CreditMemoProcessor:
-    """Clase para procesar los datos de credit memos con mejoras"""
+class DataManager:
+    """Gestor de datos desde R4Database"""
     
     def __init__(self):
+        self.db_path = r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"
+        self.df = None
         self.reason_mapping = {
             "RFC": "RETURN FOR CUSTOMER",
             "OEE": "ORDER ENTRY ERROR", 
@@ -20,493 +20,769 @@ class CreditMemoProcessor:
             "TDL": "TRANSIT DAMAGE LOSS"
         }
     
-    def process_credit_memos(self, so_df: pd.DataFrame, credit_memo_df: pd.DataFrame) -> pd.DataFrame:
-        """Procesa los credit memos con el código mejorado"""
+    def load_data(self):
+        """Carga y procesa datos desde R4Database - CORREGIDO"""
         try:
-            # Crear identificador único SO_Line
-            credit_memo_df["SO-No"] = credit_memo_df["SO-No"].astype(str)
-            credit_memo_df["Line"] = credit_memo_df["Line"].astype(str)
-            credit_memo_df["SO_Line"] = credit_memo_df["SO-No"] + "-" + credit_memo_df["Line"]
+            print("🔄 Conectando a R4Database...")
+            conn = sqlite3.connect(self.db_path)
             
-            # Merge con sales orders
-            credit_memos = so_df.merge(credit_memo_df, left_on="SO_Line", right_on="SO_Line", how="left")
+            # Cargar Sales Orders - SOLO CON CANTIDAD ABIERTA > 0
+            so_query = """
+            SELECT SO_No, Ln, Cust_PO, Req_Dt, Spr_CD, ML, 
+                   Item_Number, Description, PlanType, Opn_Q, Issue_Q, OH_Netable
+            FROM sales_order_table 
+            WHERE Ord_Cd IN ('M20', 'M55') 
+            AND Opn_Q > 0
+            """
+            so_df = pd.read_sql_query(so_query, conn)
+            so_df['SO_Line'] = so_df['SO_No'].astype(str) + '-' + so_df['Ln'].astype(str)
+            print(f"📊 Sales Orders con Opn_Q > 0: {len(so_df)}")
             
-            # Seleccionar columnas necesarias
-            columns_to_keep = [
-                "PO_Line", "SO_Line", "Req-Dt", "Spr-CD", "ML",
-                "Item-Number", "Description_x", "PlanType", "Opn-Q", "Issue-Q",
-                "OH Netable", "Invoice-No", "CM-Reason", "User-Id", "Issue-Date", "Invoice Line Memo"
-            ]
+            # Cargar Credit Memos
+            cm_query = """
+            SELECT SO_No, Line, Invoice_No, CM_Reason, User_Id, Issue_Date, Invoice_Line_Memo
+            FROM Credit_Memos
+            WHERE Invoice_No IS NOT NULL AND Invoice_No != ''
+            """
+            cm_df = pd.read_sql_query(cm_query, conn)
+            cm_df['SO_Line'] = cm_df['SO_No'].astype(str) + '-' + cm_df['Line'].astype(str)
+            print(f"📋 Credit Memos: {len(cm_df)}")
             
-            credit_memos = credit_memos[columns_to_keep]
+            # Join datos - INNER JOIN para solo coincidencias
+            merged_df = pd.merge(so_df, cm_df, on='SO_Line', how='inner')
+            print(f"🔗 Coincidencias SO con Opn_Q > 0 y CM: {len(merged_df)}")
             
-            # Limpiar y mapear razones
-            credit_memos["CM-Reason"] = credit_memos["CM-Reason"].str.upper()
-            credit_memos["CM-Reason"] = credit_memos["CM-Reason"].map(self.reason_mapping).fillna("CHECK REASON")
+            # Procesar datos
+            merged_df['CM_Reason'] = merged_df['CM_Reason'].str.upper()
+            merged_df['CM_Reason_Full'] = merged_df['CM_Reason'].map(self.reason_mapping).fillna('CHECK REASON')
+            merged_df['Issue_Date'] = pd.to_datetime(merged_df['Issue_Date'], errors='coerce')
+            merged_df['Req_Dt'] = pd.to_datetime(merged_df['Req_Dt'], errors='coerce')
             
-            # Filtrar registros con invoice
-            credit_memos["Invoice-No"] = credit_memos["Invoice-No"].fillna("")
-            credit_memos = credit_memos.loc[credit_memos["Invoice-No"] != ""]
+            # Agregar información adicional para análisis
+            merged_df['Has_Open_Qty'] = merged_df['Opn_Q'] > 0
+            merged_df['Value_Impact'] = merged_df['Issue_Q'] * 50  # Estimación de valor unitario
             
-            # Convertir fechas
-            credit_memos["Issue-Date"] = pd.to_datetime(credit_memos["Issue-Date"]).dt.date
-            credit_memos["Req-Dt"] = pd.to_datetime(credit_memos["Req-Dt"], errors='coerce').dt.date
+            conn.close()
+            self.df = merged_df
             
-            return credit_memos
+            print(f"✅ Datos procesados finales: {len(merged_df)} registros")
+            print(f"📊 Facturas únicas: {merged_df['Invoice_No'].nunique()}")
+            print(f"📦 Total Items (Issue_Q): {merged_df['Issue_Q'].sum()}")
+            
+            return True
             
         except Exception as e:
-            print(f"Error processing credit memos: {e}")
-            return pd.DataFrame()
+            print(f"❌ Error: {e}")
+            return False
+    
+    def get_kpis(self):
+        """Calcula KPIs principales - CORREGIDO"""
+        if self.df is None or self.df.empty:
+            return {
+                'total_cms': 0,
+                'total_items': 0,
+                'unique_suppliers': 0,
+                'top_reason': 'N/A',
+                'avg_issue_qty': 0,
+                'avg_days_to_today': 0
+            }
+        
+        # Cálculo de días promedio hasta hoy
+        today = pd.Timestamp.now()
+        self.df['days_to_today'] = (today - self.df['Issue_Date']).dt.days
+        avg_days = round(self.df['days_to_today'].mean(), 1)
+        
+        return {
+            'total_cms': len(self.df),
+            'total_items': int(self.df['Issue_Q'].sum()),
+            'unique_suppliers': self.df['Spr_CD'].nunique(),
+            'top_reason': self.df['CM_Reason_Full'].mode().iloc[0] if not self.df['CM_Reason_Full'].empty else 'N/A',
+            'avg_issue_qty': round(self.df['Issue_Q'].mean(), 2),
+            'avg_days_to_today': avg_days
+        }
+    
+    def get_trends_data(self):
+        """Obtiene datos para gráficos de tendencias"""
+        if self.df is None or self.df.empty:
+            return {
+                'monthly': pd.Series(),
+                'by_reason': pd.Series(),
+                'by_supplier': pd.DataFrame()
+            }
+        
+        # Por mes
+        monthly = self.df.groupby(self.df['Issue_Date'].dt.to_period('M')).size()
+        
+        # Por razón
+        by_reason = self.df['CM_Reason_Full'].value_counts().head(10)
+        
+        # Por supplier
+        by_supplier = self.df.groupby('Spr_CD').agg({
+            'Issue_Q': 'sum',
+            'SO_Line': 'count'
+        }).sort_values('SO_Line', ascending=False).head(15)
+        
+        return {
+            'monthly': monthly,
+            'by_reason': by_reason,
+            'by_supplier': by_supplier
+        }
 
-class DatabaseManager:
-    """Gestor de conexión a base de datos"""
-    
-    def __init__(self, db_path: str = "R4Database.db"):
-        self.db_path = db_path
-    
-    def get_connection(self):
-        """Obtiene conexión a la base de datos"""
-        return sqlite3.connect(self.db_path)
-    
-    def fetch_credit_memos(self) -> pd.DataFrame:
-        """Obtiene datos de credit memos desde la base de datos"""
-        try:
-            with self.get_connection() as conn:
-                query = """
-                SELECT 
-                    cm.*,
-                    so.PO_Line,
-                    so.Req_Dt as "Req-Dt",
-                    so.Spr_CD as "Spr-CD",
-                    so.ML,
-                    so.Item_Number as "Item-Number",
-                    so.Description as "Description_x",
-                    so.PlanType,
-                    so.Opn_Q as "Opn-Q",
-                    so.Issue_Q as "Issue-Q",
-                    so.OH_Netable as "OH Netable"
-                FROM credit_memos cm
-                LEFT JOIN sales_orders so ON cm.SO_Line = so.SO_Line
-                WHERE cm.Invoice_No IS NOT NULL AND cm.Invoice_No != ''
-                ORDER BY cm.Issue_Date DESC
-                """
-                return pd.read_sql_query(query, conn)
-        except Exception as e:
-            print(f"Error fetching data: {e}")
-            return self._get_sample_data()
-    
-    def _get_sample_data(self) -> pd.DataFrame:
-        """Datos de muestra para testing"""
-        return pd.DataFrame({
-            'PO_Line': ['PO001-1', 'PO002-1', 'PO003-1', 'PO004-1', 'PO005-1'],
-            'SO_Line': ['SO001-1', 'SO002-1', 'SO003-1', 'SO004-1', 'SO005-1'],
-            'Req-Dt': ['2024-01-15', '2024-01-16', '2024-01-17', '2024-01-18', '2024-01-19'],
-            'Spr-CD': ['SPR001', 'SPR002', 'SPR003', 'SPR004', 'SPR005'],
-            'ML': ['ML001', 'ML002', 'ML003', 'ML004', 'ML005'],
-            'Item-Number': ['ITM001', 'ITM002', 'ITM003', 'ITM004', 'ITM005'],
-            'Description_x': ['Item 1', 'Item 2', 'Item 3', 'Item 4', 'Item 5'],
-            'PlanType': ['A', 'B', 'A', 'C', 'B'],
-            'Opn-Q': [10, 20, 15, 30, 25],
-            'Issue-Q': [5, 10, 8, 15, 12],
-            'OH Netable': [5, 10, 7, 15, 13],
-            'Invoice-No': ['INV001', 'INV002', 'INV003', 'INV004', 'INV005'],
-            'CM-Reason': ['RFC', 'OEE', 'INE', 'PNS', 'CBC'],
-            'User-Id': ['USER1', 'USER2', 'USER3', 'USER4', 'USER5'],
-            'Issue-Date': ['2024-01-20', '2024-01-21', '2024-01-22', 'M024-01-23', '2024-01-24'],
-            'Invoice Line Memo': ['Memo 1', 'Memo 2', 'Memo 3', 'Memo 4', 'Memo 5']
-        })
-
-class CreditMemoDashboard:
-    """Dashboard principal para Credit Memos"""
+class ExecutiveDashboard:
+    """Dashboard Ejecutivo Completo"""
     
     def __init__(self, page: ft.Page):
         self.page = page
-        self.db_manager = DatabaseManager()
-        self.processor = CreditMemoProcessor()
-        self.df = pd.DataFrame()
-        self.filtered_df = pd.DataFrame()
-        
-        # Configurar página
-        self.page.title = "Credit Memo Dashboard"
-        self.page.theme_mode = ft.ThemeMode.LIGHT
-        self.page.padding = 20
-        
-        # Controles de filtros
-        self.date_from = ft.DatePicker(
-            first_date=datetime(2020, 1, 1),
-            last_date=datetime(2030, 12, 31),
-            on_change=self.on_filter_change
-        )
-        
-        self.date_to = ft.DatePicker(
-            first_date=datetime(2020, 1, 1),
-            last_date=datetime(2030, 12, 31),
-            on_change=self.on_filter_change
-        )
-        
-        self.reason_filter = ft.Dropdown(
-            label="Razón CM",
-            width=200,
-            on_change=self.on_filter_change
-        )
-        
-        self.user_filter = ft.Dropdown(
-            label="Usuario",
-            width=200,
-            on_change=self.on_filter_change
-        )
-        
-        # Contenedores para gráficos
-        self.metrics_container = ft.Container()
-        self.chart_container = ft.Container()
-        self.table_container = ft.Container()
-        
+        self.data_manager = DataManager()
         self.setup_page()
-        self.load_data()
-    
+        
     def setup_page(self):
-        """Configura la estructura de la página"""
-        # Header
+        """Configura la página con tema dark y diseño moderno"""
+        self.page.title = "🎯 Credit Memo Executive Dashboard"
+        self.page.theme_mode = ft.ThemeMode.DARK
+        self.page.bgcolor = "#0a0a0a"
+        self.page.window_width = 1600
+        self.page.window_height = 1000
+        self.page.window_maximized = True
+        self.page.padding = 0
+        
+        # Estado
+        self.status_text = ft.Text("🔄 Iniciando...", color="#00bcd4", size=16)
+        self.kpi_container = ft.Container()
+        self.charts_container = ft.Container()
+        self.data_table_container = ft.Container()
+        
+        self.build_ui()
+        self.load_dashboard_data()
+    
+    def build_ui(self):
+        """Construye la interfaz moderna"""
+        
+        # Header con gradiente
         header = ft.Container(
             content=ft.Row([
-                ft.Icon(ft.icons.ASSESSMENT, size=40, color=ft.colors.BLUE_600),
-                ft.Text("Credit Memo Dashboard", size=32, weight=ft.FontWeight.BOLD),
+                ft.Icon(ft.Icons.ANALYTICS, size=60, color="#00bcd4"),
+                ft.Column([
+                    ft.Text("CREDIT MEMO", size=36, weight=ft.FontWeight.BOLD, color="#ffffff"),
+                    ft.Text("Executive Intelligence Dashboard", size=18, color="#00bcd4")
+                ], spacing=0),
                 ft.Container(expand=True),
-                ft.ElevatedButton(
-                    "Actualizar Datos",
-                    icon=ft.icons.REFRESH,
-                    on_click=self.refresh_data
-                )
-            ]),
-            padding=20,
-            bgcolor=ft.colors.SURFACE_VARIANT,
-            border_radius=10,
-            margin=ft.margin.only(bottom=20)
+                ft.Row([
+                    ft.Container(
+                        content=ft.IconButton(
+                            ft.Icons.REFRESH,
+                            icon_color="#ffffff",
+                            icon_size=32,
+                            tooltip="Actualizar Datos",
+                            on_click=self.refresh_data,
+                            style=ft.ButtonStyle(
+                                bgcolor="#00838f",
+                                shape=ft.RoundedRectangleBorder(radius=12)
+                            )
+                        ),
+                        width=60,
+                        height=60
+                    ),
+                    ft.Container(width=10),
+                    ft.Container(
+                        content=ft.IconButton(
+                            ft.Icons.DOWNLOAD,
+                            icon_color="#ffffff",
+                            icon_size=32,
+                            tooltip="Descargar Reporte Ejecutivo",
+                            on_click=self.export_executive_report,
+                            style=ft.ButtonStyle(
+                                bgcolor="#388e3c",
+                                shape=ft.RoundedRectangleBorder(radius=12)
+                            )
+                        ),
+                        width=60,
+                        height=60
+                    )
+                ])
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            padding=30,
+            bgcolor="#1a1a1a",
+            border=ft.border.only(bottom=ft.border.BorderSide(2, "#00bcd4"))
         )
         
-        # Filtros
-        filters = ft.Container(
+        # Status bar
+        status_bar = ft.Container(
             content=ft.Row([
-                ft.ElevatedButton(
-                    "Fecha Inicio",
-                    icon=ft.icons.DATE_RANGE,
-                    on_click=lambda _: self.date_from.pick_date()
-                ),
-                ft.ElevatedButton(
-                    "Fecha Fin",
-                    icon=ft.icons.DATE_RANGE,
-                    on_click=lambda _: self.date_to.pick_date()
-                ),
-                self.reason_filter,
-                self.user_filter,
-                ft.ElevatedButton(
-                    "Limpiar Filtros",
-                    icon=ft.icons.CLEAR,
-                    on_click=self.clear_filters
-                )
-            ], wrap=True, spacing=10),
-            padding=20,
-            bgcolor=ft.colors.SURFACE_VARIANT,
-            border_radius=10,
-            margin=ft.margin.only(bottom=20)
+                ft.Icon(ft.Icons.STORAGE, color="#4caf50"),
+                self.status_text,
+                ft.Container(expand=True),
+                ft.Text(f"🕒 Última actualización: {datetime.now().strftime('%H:%M:%S')}", 
+                       color="#757575", size=14)
+            ]),
+            padding=15,
+            bgcolor="#1a1a1a"
         )
         
-        # Pestañas
+        # Tabs modernas
         tabs = ft.Tabs(
             selected_index=0,
             animation_duration=300,
+            indicator_color="#00bcd4",
+            label_color="#00bcd4",
+            unselected_label_color="#757575",
             tabs=[
                 ft.Tab(
-                    text="Resumen",
-                    icon=ft.icons.DASHBOARD,
-                    content=ft.Column([
-                        self.metrics_container,
-                        self.chart_container
-                    ])
+                    text="📊 OVERVIEW",
+                    content=ft.Container(
+                        content=ft.Column([
+                            self.kpi_container,
+                            self.charts_container
+                        ], spacing=20, scroll=ft.ScrollMode.AUTO),
+                        padding=20
+                    )
                 ),
                 ft.Tab(
-                    text="Datos Detallados",
-                    icon=ft.icons.TABLE_CHART,
-                    content=self.table_container
+                    text="📋 DATA EXPLORER",
+                    content=ft.Container(
+                        content=self.data_table_container,
+                        padding=20
+                    )
                 )
             ]
         )
         
-        # Agregar componentes a la página
+        # Layout principal
         self.page.add(
-            header,
-            filters,
-            self.date_from,
-            self.date_to,
-            tabs
+            ft.Column([
+                header,
+                status_bar,
+                ft.Container(content=tabs, expand=True)
+            ], spacing=0)
         )
     
-    def load_data(self):
-        """Carga los datos desde la base de datos"""
-        try:
-            self.df = self.db_manager.fetch_credit_memos()
-            
-            # Procesar datos si es necesario
-            if not self.df.empty:
-                # Convertir fechas
-                self.df['Issue-Date'] = pd.to_datetime(self.df['Issue-Date'], errors='coerce')
-                self.df['Req-Dt'] = pd.to_datetime(self.df['Req-Dt'], errors='coerce')
-                
-                # Mapear razones
-                self.df['CM-Reason'] = self.df['CM-Reason'].map(self.processor.reason_mapping).fillna('CHECK REASON')
-            
-            self.filtered_df = self.df.copy()
-            self.update_filters()
-            self.update_dashboard()
-            
-        except Exception as e:
-            self.show_error(f"Error cargando datos: {e}")
-    
-    def update_filters(self):
-        """Actualiza las opciones de los filtros"""
-        if not self.df.empty:
-            # Razones únicas
-            reasons = ['Todas'] + sorted(self.df['CM-Reason'].dropna().unique().tolist())
-            self.reason_filter.options = [ft.dropdown.Option(r) for r in reasons]
-            
-            # Usuarios únicos
-            users = ['Todos'] + sorted(self.df['User-Id'].dropna().unique().tolist())
-            self.user_filter.options = [ft.dropdown.Option(u) for u in users]
-    
-    def on_filter_change(self, e):
-        """Maneja cambios en los filtros"""
-        self.apply_filters()
-        self.update_dashboard()
-    
-    def apply_filters(self):
-        """Aplica los filtros seleccionados"""
-        self.filtered_df = self.df.copy()
+    def load_dashboard_data(self):
+        """Carga datos y actualiza dashboard"""
+        self.status_text.value = "🔄 Cargando datos desde R4Database..."
+        self.page.update()
         
-        # Filtro por fecha
-        if self.date_from.value:
-            self.filtered_df = self.filtered_df[
-                self.filtered_df['Issue-Date'] >= pd.to_datetime(self.date_from.value)
-            ]
+        if self.data_manager.load_data():
+            self.status_text.value = "✅ Datos cargados exitosamente"
+            self.update_kpis()
+            self.update_charts()
+            self.update_data_table()
+        else:
+            self.status_text.value = "❌ Error cargando datos"
         
-        if self.date_to.value:
-            self.filtered_df = self.filtered_df[
-                self.filtered_df['Issue-Date'] <= pd.to_datetime(self.date_to.value)
-            ]
-        
-        # Filtro por razón
-        if self.reason_filter.value and self.reason_filter.value != 'Todas':
-            self.filtered_df = self.filtered_df[
-                self.filtered_df['CM-Reason'] == self.reason_filter.value
-            ]
-        
-        # Filtro por usuario
-        if self.user_filter.value and self.user_filter.value != 'Todos':
-            self.filtered_df = self.filtered_df[
-                self.filtered_df['User-Id'] == self.user_filter.value
-            ]
-    
-    def update_dashboard(self):
-        """Actualiza todos los componentes del dashboard"""
-        self.update_metrics()
-        self.update_charts()
-        self.update_table()
         self.page.update()
     
-    def update_metrics(self):
-        """Actualiza las métricas principales"""
-        if self.filtered_df.empty:
-            return
+    def update_kpis(self):
+        """Actualiza KPIs con diseño moderno"""
+        kpis = self.data_manager.get_kpis()
         
-        total_cms = len(self.filtered_df)
-        total_items = self.filtered_df['Issue-Q'].sum()
-        unique_invoices = self.filtered_df['Invoice-No'].nunique()
+        # Solo 5 cards relevantes - SIN INVOICES
+        kpi_cards = [
+            self.create_kpi_card("💼 TOTAL CMs", f"{kpis['total_cms']:,}", "#00bcd4", "Credit Memos únicos"),
+            self.create_kpi_card("📦 TOTAL ISSUE QTY", f"{kpis['total_items']:,}", "#ff9800", "Cantidad total emitida"),
+            self.create_kpi_card("🏭 SUPPLIERS", f"{kpis['unique_suppliers']:,}", "#4caf50", "Proveedores afectados"),
+            self.create_kpi_card("⚡ TOP REASON", kpis['top_reason'][:12], "#f44336", "Razón principal"),
+            self.create_kpi_card("📅 AVG DAYS", f"{kpis['avg_days_to_today']}", "#9c27b0", "Días promedio a hoy")
+        ]
         
-        metrics = ft.Row([
-            self.create_metric_card("Total CMs", str(total_cms), ft.icons.RECEIPT, ft.colors.BLUE_600),
-            self.create_metric_card("Total Items", str(int(total_items)), ft.icons.INVENTORY, ft.colors.GREEN_600),
-            self.create_metric_card("Invoices", str(unique_invoices), ft.icons.DESCRIPTION, ft.colors.ORANGE_600),
-        ], spacing=20)
-        
-        self.metrics_container.content = metrics
+        self.kpi_container.content = ft.Container(
+            content=ft.Row(kpi_cards, spacing=20, wrap=True),
+            margin=ft.margin.only(bottom=30)
+        )
     
-    def create_metric_card(self, title: str, value: str, icon, color):
-        """Crea una tarjeta de métrica"""
+    def create_kpi_card(self, title, value, color, subtitle):
+        """Crea tarjeta KPI moderna con glassmorphism"""
         return ft.Container(
             content=ft.Column([
-                ft.Icon(icon, size=40, color=color),
-                ft.Text(value, size=24, weight=ft.FontWeight.BOLD),
-                ft.Text(title, size=14, color=ft.colors.ON_SURFACE_VARIANT)
-            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                ft.Text(title, size=12, weight=ft.FontWeight.BOLD, color="#bdbdbd"),
+                ft.Text(value, size=28, weight=ft.FontWeight.BOLD, color=color),
+                ft.Text(subtitle, size=10, color="#757575")
+            ], spacing=8, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            width=250,
+            height=120,
             padding=20,
-            bgcolor=ft.colors.SURFACE_VARIANT,
-            border_radius=10,
-            width=200,
-            height=120
+            bgcolor="#1a1a1a",
+            border=ft.border.all(1, color),
+            border_radius=15,
+            shadow=ft.BoxShadow(
+                spread_radius=1,
+                blur_radius=15,
+                color="#424242",
+                offset=ft.Offset(0, 5)
+            )
         )
     
     def update_charts(self):
-        """Actualiza los gráficos"""
-        if self.filtered_df.empty:
-            return
+        """Actualiza gráficos interactivos"""
+        trends = self.data_manager.get_trends_data()
         
-        # Gráfico de razones
-        reason_counts = self.filtered_df['CM-Reason'].value_counts()
+        # Gráfico de razones (Donut Chart)
+        reason_chart = self.create_reason_donut_chart(trends['by_reason'])
         
-        chart_row = ft.Row([
-            ft.Container(
-                content=ft.Column([
-                    ft.Text("Distribución por Razón", size=16, weight=ft.FontWeight.BOLD),
-                    ft.Container(
-                        content=self.create_pie_chart(reason_counts),
-                        height=300
-                    )
-                ]),
-                bgcolor=ft.colors.SURFACE_VARIANT,
-                border_radius=10,
-                padding=20,
-                expand=True
-            ),
-            ft.Container(
-                content=ft.Column([
-                    ft.Text("Tendencia por Fecha", size=16, weight=ft.FontWeight.BOLD),
-                    ft.Container(
-                        content=self.create_time_series(),
-                        height=300
-                    )
-                ]),
-                bgcolor=ft.colors.SURFACE_VARIANT,
-                border_radius=10,
-                padding=20,
-                expand=True
-            )
-        ], spacing=20)
+        # Gráfico de tendencias temporales
+        temporal_chart = self.create_temporal_chart(trends['monthly'])
         
-        self.chart_container.content = chart_row
+        # Gráfico de suppliers
+        supplier_chart = self.create_supplier_chart(trends['by_supplier'])
+        
+        charts_layout = ft.Column([
+            ft.Row([reason_chart, temporal_chart], spacing=30),
+            ft.Container(height=20),
+            supplier_chart
+        ])
+        
+        self.charts_container.content = charts_layout
     
-    def create_pie_chart(self, data):
-        """Crea un gráfico de pastel con los datos"""
-        # Simular gráfico con containers coloreados
-        colors = [ft.colors.BLUE_400, ft.colors.RED_400, ft.colors.GREEN_400, 
-                 ft.colors.YELLOW_600, ft.colors.PURPLE_400, ft.colors.ORANGE_400]
+    def create_reason_donut_chart(self, data):
+        """Crea gráfico donut de razones"""
+        if data.empty:
+            return ft.Container(
+                content=ft.Text("No hay datos de razones", color="#ffffff"),
+                padding=25,
+                bgcolor="#1a1a1a",
+                border_radius=15
+            )
         
-        items = []
+        # Colores vibrantes
+        colors = ['#00bcd4', '#ff5722', '#4caf50', '#ff9800', '#9c27b0', '#2196f3']
+        
+        chart_items = []
+        total = data.sum()
+        
         for i, (reason, count) in enumerate(data.head(6).items()):
+            percentage = (count / total) * 100
             color = colors[i % len(colors)]
-            percentage = (count / data.sum()) * 100
             
-            items.append(
+            chart_items.append(
                 ft.Container(
                     content=ft.Row([
-                        ft.Container(width=20, height=20, bgcolor=color, border_radius=5),
-                        ft.Text(f"{reason}: {count} ({percentage:.1f}%)", size=12)
-                    ]),
-                    margin=5
+                        ft.Container(width=20, height=20, bgcolor=color, border_radius=10),
+                        ft.Column([
+                            ft.Text(reason[:20] + "..." if len(reason) > 20 else reason, 
+                                   size=14, weight=ft.FontWeight.BOLD, color="#ffffff"),
+                            ft.Text(f"{count:,} casos ({percentage:.1f}%)", 
+                                   size=12, color="#bdbdbd")
+                        ], spacing=2)
+                    ], spacing=15),
+                    padding=ft.padding.symmetric(vertical=12, horizontal=15),
+                    margin=ft.margin.only(bottom=8),
+                    bgcolor="#1a1a1a",
+                    border_radius=10
                 )
             )
         
-        return ft.Column(items)
+        return ft.Container(
+            content=ft.Column([
+                ft.Text("📊 DISTRIBUCIÓN POR RAZONES", size=18, weight=ft.FontWeight.BOLD, color="#ffffff"),
+                ft.Container(height=15),
+                ft.Column(chart_items, scroll=ft.ScrollMode.AUTO, height=300)
+            ]),
+            width=500,
+            padding=25,
+            bgcolor="#1a1a1a",
+            border=ft.border.all(1, "#00bcd4"),
+            border_radius=15
+        )
     
-    def create_time_series(self):
-        """Crea gráfico de serie temporal"""
-        daily_counts = self.filtered_df.groupby(
-            self.filtered_df['Issue-Date'].dt.date
-        ).size().reset_index(name='count')
+    def create_temporal_chart(self, data):
+        """Crea gráfico de línea temporal"""
+        if data.empty:
+            return ft.Container(
+                content=ft.Text("No hay datos temporales", color="#ffffff"),
+                padding=25,
+                bgcolor="#1a1a1a",
+                border_radius=15
+            )
         
-        items = []
-        for _, row in daily_counts.head(10).iterrows():
-            items.append(
+        chart_items = []
+        max_val = data.max() if not data.empty else 1
+        
+        for period, count in data.tail(12).items():
+            bar_height = (count / max_val) * 200
+            
+            chart_items.append(
                 ft.Container(
-                    content=ft.Row([
-                        ft.Text(str(row['Issue-Date']), size=12, width=100),
+                    content=ft.Column([
                         ft.Container(
-                            width=row['count'] * 10,
-                            height=20,
-                            bgcolor=ft.colors.BLUE_400,
+                            width=30,
+                            height=bar_height,
+                            bgcolor="#00bcd4",
                             border_radius=5
                         ),
-                        ft.Text(str(row['count']), size=12)
-                    ]),
-                    margin=2
+                        ft.Text(str(period)[-7:], size=10, color="#bdbdbd")
+                    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    margin=ft.margin.only(right=10)
                 )
             )
         
-        return ft.Column(items, scroll=ft.ScrollMode.AUTO)
+        return ft.Container(
+            content=ft.Column([
+                ft.Text("📈 TENDENCIA TEMPORAL", size=18, weight=ft.FontWeight.BOLD, color="#ffffff"),
+                ft.Container(height=15),
+                ft.Row(chart_items, scroll=ft.ScrollMode.AUTO)
+            ]),
+            width=500,
+            padding=25,
+            bgcolor="#1a1a1a",
+            border=ft.border.all(1, "#ff9800"),
+            border_radius=15
+        )
     
-    def update_table(self):
-        """Actualiza la tabla de datos"""
-        if self.filtered_df.empty:
-            self.table_container.content = ft.Text("No hay datos disponibles")
-            return
+    def create_supplier_chart(self, data):
+        """Crea tabla de suppliers con impacto visual"""
+        if data.empty:
+            return ft.Container(
+                content=ft.Text("No hay datos de suppliers", color="#ffffff"),
+                padding=25,
+                bgcolor="#1a1a1a",
+                border_radius=15
+            )
         
-        # Crear tabla con paginación
         rows = []
-        for _, row in self.filtered_df.head(50).iterrows():
+        for supplier, row in data.head(10).iterrows():
+            impact_color = "#f44336" if row['SO_Line'] > 10 else "#ff9800" if row['SO_Line'] > 5 else "#4caf50"
+            impact_text = "🔴 ALTO" if row['SO_Line'] > 10 else "🟡 MEDIO" if row['SO_Line'] > 5 else "🟢 BAJO"
+            
             rows.append(
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text(str(row['SO_Line']))),
-                        ft.DataCell(ft.Text(str(row['Invoice-No']))),
-                        ft.DataCell(ft.Text(str(row['CM-Reason']))),
-                        ft.DataCell(ft.Text(str(row['User-Id']))),
-                        ft.DataCell(ft.Text(str(row['Issue-Date'].date() if pd.notna(row['Issue-Date']) else ''))),
-                        ft.DataCell(ft.Text(str(row['Issue-Q']))),
+                        ft.DataCell(ft.Text(supplier, color="#ffffff", weight=ft.FontWeight.BOLD)),
+                        ft.DataCell(ft.Text(f"{row['SO_Line']:,}", color="#00bcd4")),
+                        ft.DataCell(ft.Text(f"{int(row['Issue_Q']):,}", color="#ff9800")),
+                        ft.DataCell(
+                            ft.Container(
+                                content=ft.Text(impact_text, size=12, weight=ft.FontWeight.BOLD),
+                                padding=8,
+                                bgcolor="#2a2a2a",
+                                border_radius=8
+                            )
+                        )
                     ]
                 )
             )
         
-        data_table = ft.DataTable(
+        table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("SO Line")),
-                ft.DataColumn(ft.Text("Invoice No")),
-                ft.DataColumn(ft.Text("CM Reason")),
-                ft.DataColumn(ft.Text("User ID")),
-                ft.DataColumn(ft.Text("Issue Date")),
-                ft.DataColumn(ft.Text("Issue Qty")),
+                ft.DataColumn(ft.Text("🏭 SUPPLIER", weight=ft.FontWeight.BOLD, color="#ffffff")),
+                ft.DataColumn(ft.Text("📋 CMs", weight=ft.FontWeight.BOLD, color="#ffffff")),
+                ft.DataColumn(ft.Text("📦 ITEMS", weight=ft.FontWeight.BOLD, color="#ffffff")),
+                ft.DataColumn(ft.Text("⚠️ IMPACTO", weight=ft.FontWeight.BOLD, color="#ffffff"))
             ],
             rows=rows,
-            border=ft.border.all(1, ft.colors.OUTLINE),
+            bgcolor="#1a1a1a",
+            border=ft.border.all(1, "#9c27b0"),
             border_radius=10,
-            vertical_lines=ft.border.BorderSide(1, ft.colors.OUTLINE),
-            horizontal_lines=ft.border.BorderSide(1, ft.colors.OUTLINE),
+            heading_row_color="#2a2a2a"
         )
         
-        self.table_container.content = ft.Column([
-            ft.Text(f"Mostrando {len(rows)} de {len(self.filtered_df)} registros", 
-                size=14, color=ft.colors.ON_SURFACE_VARIANT),
-            ft.Container(
-                content=data_table,
-                height=400,
-                padding=10,
-                bgcolor=ft.colors.SURFACE_VARIANT,
-                border_radius=10
-            )
+        return ft.Container(
+            content=ft.Column([
+                ft.Text("🏭 TOP SUPPLIERS BY IMPACT", size=18, weight=ft.FontWeight.BOLD, color="#ffffff"),
+                ft.Container(height=15),
+                table
+            ]),
+            padding=25,
+            bgcolor="#1a1a1a",
+            border=ft.border.all(1, "#9c27b0"),
+            border_radius=15
+        )
+    
+    def update_data_table(self):
+        """Actualiza tabla de datos con scroll SIMPLE Y FUNCIONAL"""
+        if self.data_manager.df is None or self.data_manager.df.empty:
+            self.data_table_container.content = ft.Text("No hay datos disponibles", color="#ffffff")
+            return
+        
+        # Campo de búsqueda
+        search_field = ft.TextField(
+            label="🔍 Buscar SO Line, Invoice, Supplier, User...",
+            width=500,
+            color="#ffffff",
+            bgcolor="#2a2a2a",
+            border_color="#00bcd4",
+            on_change=self.search_table
+        )
+        
+        # Crear todas las filas directamente
+        self.create_all_table_rows()
+        
+        # Layout simple con scroll
+        self.data_table_container.content = ft.Column([
+            ft.Text("📋 CREDIT MEMOS DATA EXPLORER", size=20, weight=ft.FontWeight.BOLD, color="#ffffff"),
+            ft.Text(f"📊 Total: {len(self.data_manager.df):,} registros", color="#bdbdbd", size=12),
+            ft.Container(height=10),
+            search_field,
+            ft.Container(height=10),
+            self.scrollable_table
         ])
     
-    def clear_filters(self, e):
-        """Limpia todos los filtros"""
-        self.reason_filter.value = None
-        self.user_filter.value = None
-        self.date_from.value = None
-        self.date_to.value = None
-        self.filtered_df = self.df.copy()
-        self.update_dashboard()
+    def create_all_table_rows(self):
+        """Crea tabla con TODAS las filas y scroll FUNCIONAL"""
+        df = self.data_manager.df
+        
+        rows = []
+        for _, row in df.iterrows():
+            # Colores
+            opn_q_color = "#4caf50" if row['Opn_Q'] > 0 else "#f44336"
+            days_diff = (pd.Timestamp.now() - row['Issue_Date']).days
+            days_color = "#4caf50" if days_diff < 30 else "#ff9800" if days_diff < 90 else "#f44336"
+            
+            rows.append(
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text(str(row['SO_Line']), color="#00bcd4", size=11)),
+                        ft.DataCell(ft.Text(str(row['Invoice_No']), color="#ffffff", size=11)),
+                        ft.DataCell(ft.Text(str(row['CM_Reason_Full'])[:12], color="#ff9800", size=11)),
+                        ft.DataCell(ft.Text(str(row['Spr_CD']), color="#4caf50", size=11)),
+                        ft.DataCell(ft.Text(str(row['User_Id']), color="#9c27b0", size=11)),
+                        ft.DataCell(ft.Text(f"{int(row['Issue_Q'])}", color="#ffeb3b", size=11)),
+                        ft.DataCell(ft.Text(f"{int(row['Opn_Q'])}", color=opn_q_color, size=11)),
+                        ft.DataCell(ft.Text(f"{days_diff}d", color=days_color, size=11)),
+                        ft.DataCell(ft.Text(str(row['Issue_Date'].date()) if pd.notna(row['Issue_Date']) else 'N/A', color="#bdbdbd", size=11))
+                    ]
+                )
+            )
+        
+        # Tabla simple
+        data_table = ft.DataTable(
+            columns=[
+                ft.DataColumn(ft.Text("SO Line", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Invoice", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Reason", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Supplier", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("User", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Issue", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Open", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Days", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Date", weight=ft.FontWeight.BOLD, color="#ffffff", size=11))
+            ],
+            rows=rows,
+            bgcolor="#1a1a1a",
+            border_radius=10,
+            heading_row_color="#2a2a2a"
+        )
+        
+        # SCROLL REAL - Envuelto en Column con scroll explícito
+        self.scrollable_table = ft.Container(
+            content=ft.Column(
+                controls=[data_table],
+                scroll=ft.ScrollMode.ALWAYS,  # ESTO es la clave
+                auto_scroll=True
+            ),
+            height=400,
+            bgcolor="#1a1a1a",
+            border_radius=10,
+            padding=10
+        )
+    
+    def search_table(self, e):
+        """Búsqueda simple y efectiva"""
+        search_term = e.control.value.lower().strip()
+        
+        if not search_term:
+            filtered_df = self.data_manager.df.copy()
+        else:
+            mask = (
+                self.data_manager.df['SO_Line'].astype(str).str.lower().str.contains(search_term, na=False) |
+                self.data_manager.df['Invoice_No'].astype(str).str.lower().str.contains(search_term, na=False) |
+                self.data_manager.df['Spr_CD'].astype(str).str.lower().str.contains(search_term, na=False) |
+                self.data_manager.df['User_Id'].astype(str).str.lower().str.contains(search_term, na=False)
+            )
+            filtered_df = self.data_manager.df[mask]
+        
+        # Recrear tabla con datos filtrados
+        self.create_filtered_table(filtered_df)
+        self.page.update()
+    
+    def create_filtered_table(self, df):
+        """Crea tabla filtrada CON SCROLL"""
+        rows = []
+        for _, row in df.iterrows():
+            opn_q_color = "#4caf50" if row['Opn_Q'] > 0 else "#f44336"
+            days_diff = (pd.Timestamp.now() - row['Issue_Date']).days
+            days_color = "#4caf50" if days_diff < 30 else "#ff9800" if days_diff < 90 else "#f44336"
+            
+            rows.append(
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text(str(row['SO_Line']), color="#00bcd4", size=11)),
+                        ft.DataCell(ft.Text(str(row['Invoice_No']), color="#ffffff", size=11)),
+                        ft.DataCell(ft.Text(str(row['CM_Reason_Full'])[:12], color="#ff9800", size=11)),
+                        ft.DataCell(ft.Text(str(row['Spr_CD']), color="#4caf50", size=11)),
+                        ft.DataCell(ft.Text(str(row['User_Id']), color="#9c27b0", size=11)),
+                        ft.DataCell(ft.Text(f"{int(row['Issue_Q'])}", color="#ffeb3b", size=11)),
+                        ft.DataCell(ft.Text(f"{int(row['Opn_Q'])}", color=opn_q_color, size=11)),
+                        ft.DataCell(ft.Text(f"{days_diff}d", color=days_color, size=11)),
+                        ft.DataCell(ft.Text(str(row['Issue_Date'].date()) if pd.notna(row['Issue_Date']) else 'N/A', color="#bdbdbd", size=11))
+                    ]
+                )
+            )
+        
+        filtered_table = ft.DataTable(
+            columns=[
+                ft.DataColumn(ft.Text("SO Line", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Invoice", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Reason", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Supplier", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("User", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Issue", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Open", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Days", weight=ft.FontWeight.BOLD, color="#ffffff", size=11)),
+                ft.DataColumn(ft.Text("Date", weight=ft.FontWeight.BOLD, color="#ffffff", size=11))
+            ],
+            rows=rows,
+            bgcolor="#1a1a1a",
+            border_radius=10,
+            heading_row_color="#2a2a2a"
+        )
+        
+        # Aplicar el mismo scroll a la tabla filtrada
+        self.scrollable_table.content = ft.Column(
+            controls=[filtered_table],
+            scroll=ft.ScrollMode.ALWAYS,
+            auto_scroll=True
+        )
     
     def refresh_data(self, e):
-        """Refresca los datos"""
-        self.load_data()
+        """Refresca todos los datos"""
+        self.load_dashboard_data()
+        self.show_snackbar("🔄 Datos actualizados desde R4Database", "#00bcd4")
     
-    def show_error(self, message: str):
-        """Muestra un mensaje de error"""
+    def export_executive_report(self, e):
+        """Exporta reporte ejecutivo completo - ARREGLADO SIN OPTIONS"""
+        try:
+            if self.data_manager.df is None or self.data_manager.df.empty:
+                self.show_snackbar("⚠️ No hay datos para exportar", "#ff9800")
+                return
+            
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"EXECUTIVE_CREDIT_MEMO_REPORT_{timestamp}.xlsx"
+            
+            # Mostrar progreso
+            self.show_snackbar("🔄 Generando reporte ejecutivo...", "#00bcd4")
+            
+            kpis = self.data_manager.get_kpis()
+            trends = self.data_manager.get_trends_data()
+            
+            try:
+                # MÉTODO SIMPLE - Solo engine openpyxl
+                with pd.ExcelWriter(filename, engine='openpyxl') as writer:
+                    
+                    # Hoja 1: Resumen Ejecutivo
+                    executive_summary = pd.DataFrame([
+                        ['RESUMEN EJECUTIVO', ''],
+                        ['Total Credit Memos', kpis['total_cms']],
+                        ['Total Issue Quantity', kpis['total_items']],
+                        ['Suppliers Únicos', kpis['unique_suppliers']],
+                        ['Razón Principal', kpis['top_reason']],
+                        ['Promedio Issue Qty', kpis['avg_issue_qty']],
+                        ['Promedio Days to Today', kpis['avg_days_to_today']],
+                        ['', ''],
+                        ['INFORMACIÓN', ''],
+                        ['Solo SOs con Open Qty > 0', ''],
+                        ['Days = días desde Issue Date hasta hoy', ''],
+                        ['Reporte generado', datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
+                    ], columns=['Métrica', 'Valor'])
+                    executive_summary.to_excel(writer, sheet_name='Executive_Summary', index=False)
+                    
+                    # Hoja 2: Datos completos - SIN conversión de fechas problemática
+                    export_df = self.data_manager.df.copy()
+                    # Convertir fechas a string simple
+                    if 'Issue_Date' in export_df.columns:
+                        export_df['Issue_Date_Str'] = export_df['Issue_Date'].dt.strftime('%Y-%m-%d')
+                        export_df = export_df.drop('Issue_Date', axis=1)  # Remover columna datetime original
+                    
+                    if 'Req_Dt' in export_df.columns:
+                        export_df['Req_Dt_Str'] = export_df['Req_Dt'].dt.strftime('%Y-%m-%d')
+                        export_df = export_df.drop('Req_Dt', axis=1)  # Remover columna datetime original
+                    
+                    export_df.to_excel(writer, sheet_name='Credit_Memos_Data', index=False)
+                    
+                    # Hoja 3: Análisis por razones
+                    if not trends['by_reason'].empty:
+                        reason_data = []
+                        for reason, count in trends['by_reason'].items():
+                            reason_data.append([reason, count])
+                        
+                        reason_df = pd.DataFrame(reason_data, columns=['CM_Reason', 'Count'])
+                        reason_df.to_excel(writer, sheet_name='Analysis_by_Reason', index=False)
+                    
+                    # Hoja 4: Análisis por supplier
+                    if not trends['by_supplier'].empty:
+                        supplier_data = []
+                        for supplier in trends['by_supplier'].index:
+                            row = trends['by_supplier'].loc[supplier]
+                            supplier_data.append([supplier, int(row['Issue_Q']), int(row['SO_Line'])])
+                        
+                        supplier_df = pd.DataFrame(supplier_data, columns=['Supplier', 'Total_Issue_Q', 'Total_CMs'])
+                        supplier_df.to_excel(writer, sheet_name='Analysis_by_Supplier', index=False)
+                    
+                    # Hoja 5: Análisis por factura (método simple)
+                    try:
+                        invoice_data = []
+                        for invoice in self.data_manager.df['Invoice_No'].unique():
+                            invoice_subset = self.data_manager.df[self.data_manager.df['Invoice_No'] == invoice]
+                            lines_count = len(invoice_subset)
+                            total_issue_q = int(invoice_subset['Issue_Q'].sum())
+                            supplier = invoice_subset['Spr_CD'].iloc[0]
+                            issue_date = invoice_subset['Issue_Date'].iloc[0].strftime('%Y-%m-%d')
+                            
+                            invoice_data.append([invoice, lines_count, total_issue_q, supplier, issue_date])
+                        
+                        invoice_df = pd.DataFrame(invoice_data, columns=['Invoice_No', 'Lines_Count', 'Total_Issue_Q', 'Supplier', 'Issue_Date'])
+                        invoice_df.to_excel(writer, sheet_name='Analysis_by_Invoice', index=False)
+                    except Exception as invoice_error:
+                        print(f"Warning: No se pudo crear análisis por factura: {invoice_error}")
+                
+                # Verificar archivo
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename) / 1024  # KB
+                    self.show_snackbar(f"✅ Reporte exportado: {filename} ({file_size:.1f} KB)", "#4caf50")
+                    print(f"📁 Archivo guardado exitosamente: {filename}")
+                else:
+                    self.show_snackbar("❌ Error: Archivo no se creó", "#f44336")
+                
+            except PermissionError:
+                self.show_snackbar("❌ Cierra el archivo Excel si está abierto e intenta de nuevo", "#f44336")
+            except Exception as export_error:
+                print(f"Error exportación: {export_error}")
+                
+                # RESPALDO: Exportación súper simple
+                try:
+                    simple_filename = f"SIMPLE_CM_REPORT_{timestamp}.xlsx"
+                    simple_df = self.data_manager.df.copy()
+                    
+                    # Preparar datos básicos sin fechas datetime
+                    simple_df['Issue_Date'] = simple_df['Issue_Date'].dt.strftime('%Y-%m-%d')
+                    if 'Req_Dt' in simple_df.columns:
+                        simple_df['Req_Dt'] = simple_df['Req_Dt'].dt.strftime('%Y-%m-%d')
+                    
+                    simple_df.to_excel(simple_filename, index=False, engine='openpyxl')
+                    self.show_snackbar(f"✅ Exportación simple exitosa: {simple_filename}", "#4caf50")
+                    print(f"📁 Archivo simple creado: {simple_filename}")
+                    
+                except Exception as simple_error:
+                    self.show_snackbar(f"❌ Error total: {str(simple_error)}", "#f44336")
+                    print(f"Error completo: {simple_error}")
+            
+        except Exception as e:
+            self.show_snackbar(f"❌ Error general: {str(e)}", "#f44336")
+            print(f"Error general en export: {e}")
+    
+    def show_snackbar(self, message, color):
+        """Muestra mensaje de estado"""
         self.page.snack_bar = ft.SnackBar(
-            content=ft.Text(message),
-            bgcolor=ft.colors.ERROR,
+            content=ft.Text(message, color="#ffffff"),
+            bgcolor=color
         )
         self.page.snack_bar.open = True
         self.page.update()
 
 def main(page: ft.Page):
-    """Función principal de la aplicación"""
-    dashboard = CreditMemoDashboard(page)
+    """Función principal"""
+    dashboard = ExecutiveDashboard(page)
 
 if __name__ == "__main__":
-    ft.app(target=main, port=8000)
+    print("🚀 INICIANDO EXECUTIVE DASHBOARD")
+    print("🎯 Modo Dark Theme Activado")
+    print("📊 Conectando a R4Database...")
+    ft.app(target=main, port=8084)
