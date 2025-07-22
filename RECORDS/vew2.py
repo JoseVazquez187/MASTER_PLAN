@@ -1049,7 +1049,7 @@ class ExecutiveDashboard:
                     # Lista de usuarios
                     ft.Text("📋 Usuarios Registrados", size=20, weight=ft.FontWeight.W_500),
                     ft.Text("💡 Click en 'Editar' para modificar cualquier campo incluida la contraseña", 
-                           size=12, color=ft.Colors.WHITE54, italic=True),
+                        size=12, color=ft.Colors.WHITE54, italic=True),
                     ft.Container(height=15),
                     ft.Container(
                         content=users_list,
@@ -1164,7 +1164,7 @@ class ExecutiveDashboard:
         
         def create_team_card(member):
             status_color = ft.Colors.GREEN if member["status"] == "Active" else \
-                          ft.Colors.ORANGE if member["status"] == "In Meeting" else ft.Colors.GREY
+                        ft.Colors.ORANGE if member["status"] == "In Meeting" else ft.Colors.GREY
             
             return ft.Container(
                 width=250,

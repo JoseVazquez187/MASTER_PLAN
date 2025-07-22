@@ -1094,7 +1094,6 @@ TABLES_CONFIG = {
         WoNo TEXT
     )"""
 },
-
 # ==================== TABLA Credit Memos ====================
 "Credit_Memos": {
     "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\Credit Memos\Credit_Memos.xlsx",
@@ -1251,7 +1250,152 @@ TABLES_CONFIG = {
     )"""
 }
 },
+# ==================== TABLA OpenWO_with_Closed_SO ====================
+"OpenWO_with_Closed_SO": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\PR 5 58\pr558.txt",
+    "table_name": "OpenWO_with_Closed_SO",
+    "file_type": "fixed_width",
+    "fixed_width_params": {
+        "widths": [10,2,10,32,31,9,5,10,20],
+        "header": 3,
+        "skip_rows": [0]
+    },
+    "data_filters": {
+        "exclude_rows_multiple": {
+            "column": "WO-No   Su",
+            "values": ["**", "End-of-Rep"]
+        }
+    },
+    "columns_mapping": {
+        'WO-No   Su': 'WONo',
+        'b': 'Sub',
+        'Req-Date': 'DueDate_WO',
+        'Order-No': 'OrderNo',
+        'Item-No': 'ItemNo',
+        'Req-Date.1': 'ReqDate1'  # Mantener ReqDate1
+    },
+    "columns_order_original": [
+        'WO-No   Su', 'b', 'Req-Date', 'Item-No', 'Description', 'Order-No', 'Ln', 'Req-Date.1', 'Entity'
+    ],
+    "columns_order_renamed": [
+        'WONo', 'Sub', 'DueDate_WO', 'ItemNo', 'Description', 'OrderNo', 'Ln', 'ReqDate1', 'Entity'  # Incluir ReqDate1
+    ],
+    "special_processing": {
+        "clear_before_insert": True,
+        "custom_cleaning": True,
+        "final_columns_only": True
+    },
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS OpenWO_with_Closed_SO(
+        WONo TEXT,
+        Sub TEXT,
+        DueDate_WO TEXT,
+        ItemNo TEXT,
+        Description TEXT,
+        OrderNo TEXT,
+        Ln TEXT,
+        ReqDate1 TEXT,  -- Cambiar a ReqDate1
+        Entity TEXT
+    )"""
+},
+# ==================== TABLA IN 5 6====================
+"prepetual_in56": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\IN 5 6\HISTORICO.txt",
+    "table_name": "prepetual_in56",
+    "file_type": "fixed_width",
+    "fixed_width_params": {
+        "widths": [9,7,5,32,8,7,10,16,16,9,9,18,8,13,28,17,7,15,12,15,10,9,7,18,10],
+        "header": 0,
+        "skip_rows": [0],
+        "drop_last_row": True
+    },
+    "columns_mapping": {
+        'Date': 'Date',
+        'Reason': 'Reason',
+        'Acct': 'Action',
+        'Item Number': 'ItemNo',
+        'Product': 'PRD',
+        'Group': 'Group',
+        'A/C': 'AC',
+        'Lot No': 'LotNo',
+        'Fam-Code': 'FamCode',
+        'PlanTp': 'PlanType',
+        'Ent': 'Entity',
+        'Qty': 'Qty',
+        'UM': 'UM',
+        'Cur Std': 'CurStd',
+        'DR': 'DR',
+        'CR': 'CR',
+        'NET': 'NET',
+        'Reference': 'Reference',
+        'To-Entity': 'ToEntity',
+        'Seq No': 'SeqNo',
+        'Userid': 'Userid',
+        'BinLoc': 'BinLoc',
+        'Zone': 'Zone',
+        'Reference2': 'Reference2',
+        'DateTime': 'DateTime'
+    },
+
+
+    "columns_order_original": [
+        'Date', 'Reason', 'Acct', 'Item Number', 'Product', 'Group', 'A/C',
+        'Lot No', 'Fam-Code', 'PlanTp', 'Ent', 'Qty', 'UM', 'Cur Std', 'DR',
+        'CR', 'NET', 'Reference', 'To-Entity', 'Seq No', 'Userid', 'BinLoc',
+        'Zone', 'Reference2', 'DateTime'
+    ],
+    "columns_order_renamed": [
+        'Date', 'Reason', 'Action', 'ItemNo', 'PRD', 'Group', 'AC',
+        'LotNo', 'FamCode', 'PlanType', 'Entity', 'Qty', 'UM', 'CurStd', 'DR',
+        'CR', 'NET', 'Reference', 'ToEntity', 'SeqNo', 'Userid', 'BinLoc',
+        'Zone', 'Reference2', 'DateTime'
+    ],
+    "special_processing": {
+        "clear_before_insert": True,
+        "has_control_table": True,
+        "custom_cleaning": True,
+        "numeric_columns": ["Qty"],
+        "final_columns_only": False
+    },
+    "create_table_sql": """
+    CREATE TABLE IF NOT EXISTS prepetual_in56 (
+        Date TEXT,
+        Reason TEXT,
+        Action TEXT,
+        ItemNo TEXT,
+        PRD TEXT,
+        [Group] TEXT,
+        AC TEXT,
+        LotNo TEXT,
+        FamCode TEXT,
+        PlanType TEXT,
+        Entity TEXT,
+        Qty INTEGER,
+        UM TEXT,
+        CurStd REAL,
+        DR REAL,
+        CR REAL,
+        NET REAL,
+        Reference TEXT,
+        ToEntity TEXT,
+        SeqNo TEXT,
+        Userid TEXT,
+        BinLoc TEXT,
+        Zone TEXT,
+        Reference2 TEXT,
+        DateTime TEXT
+    )""",
+    "control_table": {
+        "table_name": "prepetual_in56",
+        "create_table_sql": """CREATE TABLE IF NOT EXISTS prepetual_in56(
+            last_loaded_date TEXT,
+            file_name TEXT
+        )"""
+    }
+
 }
+
+}
+
 
 # Rutas globales usando raw strings para evitar problemas con backslashes
 BASE_PATHS = {
