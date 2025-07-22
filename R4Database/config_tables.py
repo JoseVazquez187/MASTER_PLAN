@@ -6,8 +6,6 @@ from pathlib import Path
 
 # Configuración centralizada para todas las tablas
 TABLES_CONFIG = {
-# ==================== TABLA Credit_Memos ====================
-
 
 # ==================== TABLA SALES_ORDER_TABLE ====================
 "sales_order_table": {
@@ -205,7 +203,7 @@ TABLES_CONFIG = {
         'Req-Date': 'ReqDate',
         'Ship-Date': 'ShipDate',
         'MLIK Code': 'MLIKCode',
-        'STD-Cost': 'STDCost',
+        'Std-Cost': 'STDCost',
         'Lot-Size': 'LotSize',
         'Fill-Doc': 'FillDoc',
         'Demand - Type': 'DemandType'
@@ -214,13 +212,13 @@ TABLES_CONFIG = {
         'Entity Group', 'Project', 'A/C', 'Item-No', 'Description',
         'PlanTp', 'Ref', 'Sub', 'Sort', 'Fill-Doc', 'Demand - Type', 'Req-Qty',
         'Demand-Source', 'Unit', 'Vendor', 'Req-Date', 'Ship-Date', 'OH', 
-        'MLIK Code', 'LT', 'STD-Cost', 'Lot-Size', 'UOM'
+        'MLIK Code', 'LT', 'Std-Cost', 'Lot-Size', 'UOM'
     ],
     "columns_order_renamed": [
         'EntityGroup', 'Project', 'AC', 'ItemNo', 'Description',
         'PlanTp', 'Ref', 'Sub', 'Sort', 'FillDoc', 'DemandType', 'ReqQty',
         'DemandSource', 'Unit', 'Vendor', 'ReqDate', 'ShipDate', 'OH', 
-        'MLIKCode', 'LT', 'STDCost', 'LotSize', 'UOM'
+        'MLIKCode', 'LT', 'Std-Cost', 'LotSize', 'UOM'
     ],
     "create_table_sql": """CREATE TABLE IF NOT EXISTS expedite(
         id INTEGER PRIMARY KEY,
@@ -244,7 +242,7 @@ TABLES_CONFIG = {
         OH TEXT,
         MLIKCode TEXT,
         LT TEXT,
-        STDCost TEXT,
+        "Std-Cost" TEXT,
         LotSize TEXT,
         UOM TEXT
     )"""
@@ -1392,8 +1390,73 @@ TABLES_CONFIG = {
         )"""
     }
 
+},
+# ==================== TABLA KITING GROUPS====================
+"kiting_groups": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\Grupos Kiting\GRUPOS.xlsx",
+    "table_name": "kiting_groups",
+    "file_type": "excel",
+    
+    "excel_params": {
+        "skiprows": 1,      # Cambiado de "skip_rows" a "skiprows" (formato pandas)
+        "header": 0,        # Usar la primera fila (después del skip) como header
+        "usecols": "A:G"    # Solo usar las primeras 7 columnas (A-G), elimina las últimas 3
+    },
+    
+    # ✅ NUEVO: Filtrar filas de metadata del sistema
+    "data_filters": {
+        "exclude_rows_containing": [
+            "Results Complete",
+            "Report was generated", 
+            "Query String",
+            "record(s) shown",
+            "seconds",
+            "NO-LOCK WHERE",
+            "Query finished",
+            "EACH cndez"
+        ]
+    },
+    
+    "special_processing": {
+        "force_column_names": True,     # Forzar nombres de columnas del mapping
+        "auto_detect_header": True,     # Detectar automáticamente el header
+        "remove_system_rows": True,     # ✅ NUEVO: Eliminar filas del sistema
+        "clean_numeric_data": True,     # ✅ NUEVO: Limpiar datos numéricos
+        "filter_nan_rows": True         # ✅ NUEVO: Filtrar filas con muchos 'nan'
+    },
+    
+    "columns_mapping": {
+        'cndez.Wo-Group.Group-no': 'Groupno',
+        'cndez.Wo-Group.In-entity': 'Entity',
+        'cndez.Wo-Group.SortG-list': 'SortGlist',
+        'cndez.Wo-Group.Tool-group': 'Toolgroup',
+        'cndez.Wo-Group.tool-item': 'Toolitem',
+        'cndez.Wo-Group.Tool-TaktTime': 'Tool_TaktTime',
+        'cndez.Wo-Group.wo-no': 'WO'
+    },
+    
+    "columns_order_original": [
+        'cndez.Wo-Group.Group-no', 'cndez.Wo-Group.In-entity',
+        'cndez.Wo-Group.SortG-list', 'cndez.Wo-Group.Tool-group',
+        'cndez.Wo-Group.tool-item', 'cndez.Wo-Group.Tool-TaktTime',
+        'cndez.Wo-Group.wo-no'
+    ],
+    
+    "columns_order_renamed": [
+        'Groupno', 'Entity', 'SortGlist', 'Toolgroup', 'Toolitem', 'Tool_TaktTime', 'WO'
+    ],
+    
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS kiting_groups(
+        id INTEGER PRIMARY KEY,
+        Groupno TEXT,
+        Entity TEXT,
+        SortGlist TEXT,
+        Toolgroup TEXT,
+        Toolitem TEXT,
+        Tool_TaktTime TEXT,
+        WO TEXT
+    )"""
 }
-
 }
 
 
@@ -1611,21 +1674,170 @@ def read_file_data(file_path, table_config):
         except UnicodeDecodeError:
             return pd.read_csv(file_path, encoding='latin-1')
 
-def apply_data_filters(df, table_config):
-    """Aplica filtros de datos según configuración"""
-    data_filters = table_config.get("data_filters", {})
+# def apply_data_filters(df, table_config):
+#     """Aplica filtros de datos según configuración"""
+#     data_filters = table_config.get("data_filters", {})
     
-    # Filtro para excluir filas
+#     # Filtro para excluir filas
+#     exclude_rows = data_filters.get("exclude_rows", {})
+#     if exclude_rows:
+#         for column, value in exclude_rows.items():
+#             if column in df.columns:
+#                 initial_count = len(df)
+#                 df = df.loc[df[column] != value]
+#                 filtered_count = initial_count - len(df)
+#                 print(f"   🔽 Filtro aplicado: Excluidas {filtered_count} filas donde {column} = '{value}'")
+    
+#     return df
+
+# FUNCIÓN ACTUALIZADA PARA APLICAR FILTROS
+# ===============================================
+def apply_data_filters(df, table_config):
+    """Aplica filtros de datos según configuración - VERSIÓN ACTUALIZADA"""
+    data_filters = table_config.get("data_filters", {})
+    initial_count = len(df)
+    
+    print(f"🔍 Aplicando filtros de datos... Filas iniciales: {initial_count}")
+    
+    # Filtro para excluir filas que contienen ciertas palabras
+    exclude_containing = data_filters.get("exclude_rows_containing", [])
+    if exclude_containing:
+        print(f"   🔍 Buscando filas que contengan: {exclude_containing}")
+        
+        for keyword in exclude_containing:
+            # Buscar keyword en todas las columnas (convertir todo a string)
+            mask = df.astype(str).apply(lambda x: x.str.contains(keyword, case=False, na=False)).any(axis=1)
+            rows_with_keyword = mask.sum()
+            
+            if rows_with_keyword > 0:
+                print(f"   🗑️ Eliminando {rows_with_keyword} filas que contienen '{keyword}'")
+                df = df[~mask]
+    
+    # Filtro original para excluir filas por columna específica
     exclude_rows = data_filters.get("exclude_rows", {})
     if exclude_rows:
         for column, value in exclude_rows.items():
             if column in df.columns:
-                initial_count = len(df)
+                initial_col_count = len(df)
                 df = df.loc[df[column] != value]
-                filtered_count = initial_count - len(df)
-                print(f"   🔽 Filtro aplicado: Excluidas {filtered_count} filas donde {column} = '{value}'")
+                filtered_count = initial_col_count - len(df)
+                if filtered_count > 0:
+                    print(f"   🔽 Filtro aplicado: Excluidas {filtered_count} filas donde {column} = '{value}'")
+    
+    # Filtro para filas con demasiados valores 'nan' o vacíos
+    if data_filters.get("filter_nan_rows", False):
+        print("   🧹 Filtrando filas con exceso de valores 'nan'...")
+        # Calcular porcentaje de 'nan' por fila
+        nan_threshold = 0.7  # 70% de la fila debe ser 'nan' para eliminarla
+        
+        nan_mask = df.astype(str).apply(lambda x: (x.str.contains('^nan$|^$', case=False, na=True)).sum() / len(df.columns) > nan_threshold, axis=1)
+        nan_rows = nan_mask.sum()
+        
+        if nan_rows > 0:
+            print(f"   🗑️ Eliminando {nan_rows} filas con más de {nan_threshold*100}% valores 'nan'")
+            df = df[~nan_mask]
+    
+    final_count = len(df)
+    filtered_total = initial_count - final_count
+    
+    if filtered_total > 0:
+        print(f"   ✅ Total de filas filtradas: {filtered_total}")
+        print(f"   📊 Filas restantes: {final_count}")
+    else:
+        print(f"   ℹ️ No se encontraron filas para filtrar")
     
     return df
+
+# ===============================================
+# FUNCIÓN ESPECÍFICA PARA KITING_GROUPS
+# ===============================================
+def process_kiting_groups_with_filters(file_path, table_config):
+    """
+    Procesamiento específico para kiting_groups con filtros de metadata
+    """
+    import pandas as pd
+    
+    print("🔧 Procesando kiting_groups con filtros de metadata...")
+    
+    try:
+        # 1. Cargar datos con parámetros Excel
+        excel_params = table_config.get("excel_params", {})
+        skiprows = excel_params.get("skiprows", 0)
+        usecols = excel_params.get("usecols", None)
+        
+        print(f"   📖 Cargando Excel con skiprows={skiprows}, usecols={usecols}")
+        df = pd.read_excel(file_path, skiprows=skiprows, header=0, usecols=usecols)
+        
+        print(f"   📊 Datos cargados: {len(df)} filas, {len(df.columns)} columnas")
+        print(f"   📋 Columnas: {list(df.columns)}")
+        
+        # 2. CRÍTICO: Aplicar filtros ANTES de cualquier otro procesamiento
+        df = apply_data_filters(df, table_config)
+        
+        # 3. Manejar columnas "Unnamed"
+        if any('Unnamed' in str(col) for col in df.columns):
+            print("   🔧 Detectadas columnas 'Unnamed', asignando nombres...")
+            expected_columns = table_config.get("columns_order_original", [])
+            
+            if len(df.columns) <= len(expected_columns):
+                df.columns = expected_columns[:len(df.columns)]
+                print(f"   ✅ Columnas renombradas: {list(df.columns)}")
+        
+        # 4. Aplicar mapping de columnas
+        columns_mapping = table_config.get("columns_mapping", {})
+        if columns_mapping:
+            df = df.rename(columns=columns_mapping)
+            print(f"   🔄 Mapping aplicado: {list(df.columns)}")
+        
+        # 5. Seleccionar solo las columnas finales
+        final_columns = table_config.get("columns_order_renamed", [])
+        available_columns = [col for col in final_columns if col in df.columns]
+        
+        if available_columns:
+            df = df[available_columns]
+            print(f"   📋 Columnas finales seleccionadas: {len(available_columns)}")
+        
+        # 6. Limpieza final de datos
+        print("   🧹 Aplicando limpieza final...")
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                # Reemplazar 'nan' string con valores vacíos
+                df[col] = df[col].astype(str).replace(['nan', 'NaN', 'None'], '').str.strip()
+                # Convertir cadenas vacías a NaN real para eliminar después
+                df[col] = df[col].replace('', pd.NA)
+        
+        # 7. Eliminar filas donde todas las columnas importantes están vacías
+        important_cols = ['Groupno', 'Entity', 'WO']  # Columnas clave que no deben estar vacías
+        available_important = [col for col in important_cols if col in df.columns]
+        
+        if available_important:
+            initial_clean = len(df)
+            df = df.dropna(subset=available_important, how='all')
+            final_clean = len(df)
+            if initial_clean != final_clean:
+                print(f"   🗑️ Eliminadas {initial_clean - final_clean} filas con columnas importantes vacías")
+        
+        print(f"   ✅ Procesamiento completado: {len(df)} filas finales")
+        
+        # 8. Mostrar muestra de datos para verificar
+        if not df.empty:
+            print("   📄 Muestra de datos finales:")
+            sample = df.head(3)
+            for idx, row in sample.iterrows():
+                print(f"   Fila {idx}: {dict(row)}")
+            
+            print(f"   📄 Últimas filas para verificar filtros:")
+            sample_last = df.tail(3)
+            for idx, row in sample_last.iterrows():
+                print(f"   Fila {idx}: {dict(row)}")
+        
+        return df
+        
+    except Exception as e:
+        print(f"   ❌ Error procesando kiting_groups: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 def apply_special_processing(df, table_config):
     """Aplica procesamiento especial según configuración"""
