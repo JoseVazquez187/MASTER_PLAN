@@ -1674,22 +1674,6 @@ def read_file_data(file_path, table_config):
         except UnicodeDecodeError:
             return pd.read_csv(file_path, encoding='latin-1')
 
-# def apply_data_filters(df, table_config):
-#     """Aplica filtros de datos según configuración"""
-#     data_filters = table_config.get("data_filters", {})
-    
-#     # Filtro para excluir filas
-#     exclude_rows = data_filters.get("exclude_rows", {})
-#     if exclude_rows:
-#         for column, value in exclude_rows.items():
-#             if column in df.columns:
-#                 initial_count = len(df)
-#                 df = df.loc[df[column] != value]
-#                 filtered_count = initial_count - len(df)
-#                 print(f"   🔽 Filtro aplicado: Excluidas {filtered_count} filas donde {column} = '{value}'")
-    
-#     return df
-
 # FUNCIÓN ACTUALIZADA PARA APLICAR FILTROS
 # ===============================================
 def apply_data_filters(df, table_config):
