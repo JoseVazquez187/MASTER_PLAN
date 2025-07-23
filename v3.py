@@ -299,9 +299,57 @@ class ExecutiveDashboard:
             self.show_snackbar_simple(error_msg, "#ef4444")
             print(f"❌ Error ejecutando Grupos/Kiteo Dashboard: {ex}")
 
-    def launch_vew2_dashboard(self, e):
-        """Botón de referencia - No funcional por ahora"""
-        self.show_snackbar_simple("🔧 Función en desarrollo - Solo referencia", "#f97316")
+    def launch_validation_backschedule(self, e):
+        """Lanza el dashboard de Grupos/Kiteo"""
+        try:
+            # Mostrar mensaje de carga
+            self.show_snackbar_simple("🚀 Iniciando validacion del backschedule Dashboard...", "#7c3aed")
+            
+            # Buscar archivo grupo.py en el directorio actual
+            Validate_bs_file = "Validate_bs.py"
+            
+            if not os.path.exists(Validate_bs_file):
+                error_msg = f"❌ Archivo {Validate_bs_file} no encontrado"
+                self.show_snackbar_simple(error_msg, "#ef4444")
+                print(error_msg)
+                print(f"📁 Archivos Python en directorio: {[f for f in os.listdir('.') if f.endswith('.py')]}")
+                return
+
+            def run_external_app():
+                try:
+                    print(f"🚀 Ejecutando: {Validate_bs_file}")
+                    process = subprocess.Popen([
+                        sys.executable, Validate_bs_file
+                    ], 
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.PIPE,
+                    creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0
+                    )
+                    
+                    print(f"✅ Grupos/Kiteo Dashboard ({Validate_bs_file}) iniciado con PID: {process.pid}")
+                    
+                    # Verificar errores inmediatos
+                    time.sleep(3)
+                    if process.poll() is not None:
+                        stdout, stderr = process.communicate()
+                        if stderr:
+                            print(f"❌ Error en {Validate_bs_file}: {stderr.decode()}")
+                        else:
+                            print(f"✅ {Validate_bs_file} ejecutado correctamente")
+                        
+                except Exception as e:
+                    print(f"❌ Error ejecutando {Validate_bs_file}: {e}")
+            
+            # Ejecutar en hilo separado
+            kiteo_thread = threading.Thread(target=run_external_app, daemon=True)
+            kiteo_thread.start()
+            
+            # Mostrar confirmación
+            self.show_snackbar_simple(f"✅ Validacion de BS Dashboard iniciado", "#15803d")
+        except Exception as ex:
+            error_msg = f"❌ Error: {str(ex)}"
+            self.show_snackbar_simple(error_msg, "#ef4444")
+            print(f"❌ Error ejecutando Grupos/Kiteo Dashboard: {ex}")
 
     def show_login_screen(self):
         """Mostrar pantalla de login"""
@@ -522,7 +570,7 @@ class ExecutiveDashboard:
         # Información del perfil
         profile_info = ft.Column([
             ft.Text(f"{self.current_user['first_name']} {self.current_user['last_name']}", 
-                   size=14, weight=ft.FontWeight.W_500),
+                size=14, weight=ft.FontWeight.W_500),
             ft.Text(self.current_user['role'].capitalize(), size=12, color=ft.Colors.WHITE54),
         ], spacing=2)
         
@@ -613,7 +661,7 @@ class ExecutiveDashboard:
                         content=ft.Row([
                             ft.Column([
                                 ft.Text(f"Welcome back, {self.current_user['first_name']}", 
-                                       size=32, weight=ft.FontWeight.BOLD),
+                                        size=32, weight=ft.FontWeight.BOLD),
                                 ft.Text(f"Today is {datetime.now().strftime('%B %d, %Y')}", 
                                     size=16, color=ft.Colors.WHITE54),
                             ]),
@@ -732,7 +780,7 @@ class ExecutiveDashboard:
                                 ft.ElevatedButton(
                                     "🎯 Credit Memo Dashboard",
                                     icon=ft.Icons.ANALYTICS,
-                                    bgcolor="#15803d",  # Verde oscuro
+                                    bgcolor="#0f99bb",  # Verde oscuro
                                     color=ft.Colors.WHITE,
                                     height=80,
                                     width=250,
@@ -744,7 +792,7 @@ class ExecutiveDashboard:
                                 ft.ElevatedButton(
                                     "📦 Grupos/Kiteo Dashboard",
                                     icon=ft.Icons.INVENTORY,
-                                    bgcolor="#7c3aed",  # Púrpura oscuro
+                                    bgcolor="#2e55a8",  # Púrpura oscuro
                                     color=ft.Colors.WHITE,
                                     height=80,
                                     width=250,
@@ -754,13 +802,13 @@ class ExecutiveDashboard:
                                     )
                                 ),
                                 ft.ElevatedButton(
-                                    "🔧 Función de Referencia",
+                                    "➕➖✖️➗ Validacion del BackSchedule",
                                     icon=ft.Icons.INFO_OUTLINE,
-                                    bgcolor="#6b7280",  # Gris medio
-                                    color=ft.Colors.WHITE,
+                                    bgcolor="#e4eaf7",  # Gris medio
+                                    color=ft.Colors.BLACK,
                                     height=80,
                                     width=250,
-                                    on_click=self.launch_vew2_dashboard,
+                                    on_click=self.launch_validation_backschedule,
                                     style=ft.ButtonStyle(
                                         shape=ft.RoundedRectangleBorder(radius=15)
                                     )
@@ -770,10 +818,10 @@ class ExecutiveDashboard:
                             ft.Text("📁 Archivos en directorio raíz:", size=12, color=ft.Colors.WHITE54, italic=True),
                             ft.Text("• cm.py (Credit Memos) ✅", size=11, color=ft.Colors.GREEN_400),
                             ft.Text("• grupo.py (Grupos/Kiteo) ✅", size=11, color=ft.Colors.PURPLE_400),
-                            ft.Text("• Función de referencia (Sin implementar)", size=11, color=ft.Colors.GREY_400),
+                            ft.Text("• Validar_bs.py(Validacion del Backschedule)", size=11, color=ft.Colors.GREY_400),
                             ft.Container(height=20),
                             ft.Text("💡 Los dashboards se ejecutan en procesos independientes", 
-                                   size=12, color=ft.Colors.BLUE_400, italic=True),
+                                    size=12, color=ft.Colors.BLUE_400, italic=True),
                         ]),
                         padding=40,
                         bgcolor="#2e2e2e",  # Gris oscuro
