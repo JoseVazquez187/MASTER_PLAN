@@ -471,7 +471,6 @@ class BackScheduleAnalyzer:
             print(f"ERROR en export: {e}")
             return {"success": False, "message": f"Error: {str(e)}"}
 
-
 def create_metric_card(title, value, subtitle="", color=COLORS['accent']):
     """Crear tarjeta de métrica"""
     return ft.Card(
@@ -809,8 +808,6 @@ def create_export_card(analyzer, export_callback):
         ),
         elevation=8
     )
-
-
 
 def main(page: ft.Page):
     page.title = "BackSchedule Analytics Dashboard - INTERPRETACIÓN FINAL"
