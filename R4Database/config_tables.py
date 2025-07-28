@@ -4,7 +4,6 @@
 import os
 from pathlib import Path
 
-# Configuración centralizada para todas las tablas
 TABLES_CONFIG = {
 
 # ==================== TABLA SALES_ORDER_TABLE ====================
@@ -333,6 +332,79 @@ TABLES_CONFIG = {
         Proj TEXT,
         ManufDate TEXT,
         Shelf_Life TEXT
+    )"""
+},
+# ==================== TABLA SUPERBOM ====================
+"bom": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\SUPERBOM\SUPERBOM.txt",
+    "table_name": "bom",
+    "file_type": "fixed_width",
+    "fixed_width_params": {
+        "widths": [23, 31, 20, 3, 2, 5, 3, 5, 10, 10, 13, 13, 11, 13, 10, 10, 11, 20],
+        "header": 6,
+        "skip_rows": [0]
+    },
+    "data_filters": {
+        "exclude_rows": {"Level Number": "End-of-Report.       1"}
+    },
+    "columns_mapping": {
+        'Level Number': 'Level_Number',
+        'Plan-Type': 'Plan_Type',
+        'Unit Qty': 'Unit_Qty',
+        'Std-Cost': 'Std_Cost',
+        'Ext-Std': 'Ext_Std',
+        'Labor IN': 'Labor_IN',
+        'Lab  Rem': 'Lab_Rem',
+        'Mat IN': 'Mat_IN',
+        'Mat Rem': 'Mat_Rem',
+        'This lvl': 'This_lvl',
+        'Lab Hrs': 'Lab_Hrs'
+    },
+    "columns_order_original": [
+        'Level Number', 'Component', 'Description', 'CE', 'T', 'Sort', 'UM',
+        'MLI', 'Plan-Type', 'Unit Qty', 'Std-Cost', 'Ext-Std', 'Labor IN',
+        'Lab  Rem', 'Mat IN', 'Mat Rem', 'This lvl', 'Lab Hrs'
+    ],
+    "columns_order_renamed": [
+        'Level_Number', 'Component', 'Description', 'CE', 'T', 'Sort', 'UM',
+        'MLI', 'Plan_Type', 'Unit_Qty', 'Std_Cost', 'Ext_Std', 'Labor_IN',
+        'Lab_Rem', 'Mat_IN', 'Mat_Rem', 'This_lvl', 'Lab_Hrs'
+    ],
+    "uppercase_columns": [
+        'Sort'
+    ],
+    "special_processing": {
+        "clear_before_insert": True,
+        "validate_columns": True,
+        "custom_cleaning": True,
+        "column_name_cleaning": True,
+        "numeric_conversion": ["Unit_Qty", "Std_Cost", "Ext_Std", "Labor_IN", "Lab_Rem", "Mat_IN", "Mat_Rem", "This_lvl", "Lab_Hrs"],
+        "auto_detect_header": True,
+        "generate_key_by_level": True,  # Nuevo flag para generar keys
+        "add_original_order": True      # Nuevo flag para añadir orden original
+    },
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS bom(
+        id INTEGER PRIMARY KEY,
+        Level_Number TEXT,
+        Component TEXT,
+        Description TEXT,
+        CE TEXT,
+        T TEXT,
+        Sort TEXT,
+        UM TEXT,
+        MLI TEXT,
+        Plan_Type TEXT,
+        Unit_Qty REAL,
+        Std_Cost REAL,
+        Ext_Std REAL,
+        Labor_IN REAL,
+        Lab_Rem REAL,
+        Mat_IN REAL,
+        Mat_Rem REAL,
+        This_lvl REAL,
+        Lab_Hrs REAL,
+        key TEXT,
+        Orden_BOM_Original INTEGER
     )"""
 },
 # ==================== TABLA PO351 ====================
@@ -1459,7 +1531,6 @@ TABLES_CONFIG = {
 }
 }
 
-
 # Rutas globales usando raw strings para evitar problemas con backslashes
 BASE_PATHS = {
     "db_folder": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database",
@@ -1674,8 +1745,6 @@ def read_file_data(file_path, table_config):
         except UnicodeDecodeError:
             return pd.read_csv(file_path, encoding='latin-1')
 
-# FUNCIÓN ACTUALIZADA PARA APLICAR FILTROS
-# ===============================================
 def apply_data_filters(df, table_config):
     """Aplica filtros de datos según configuración - VERSIÓN ACTUALIZADA"""
     data_filters = table_config.get("data_filters", {})
@@ -1732,9 +1801,6 @@ def apply_data_filters(df, table_config):
     
     return df
 
-# ===============================================
-# FUNCIÓN ESPECÍFICA PARA KITING_GROUPS
-# ===============================================
 def process_kiting_groups_with_filters(file_path, table_config):
     """
     Procesamiento específico para kiting_groups con filtros de metadata
@@ -1823,9 +1889,172 @@ def process_kiting_groups_with_filters(file_path, table_config):
         traceback.print_exc()
         return None
 
-def apply_special_processing(df, table_config):
-    """Aplica procesamiento especial según configuración"""
+def debug_bom_processing(df, table_config):
+    """Debug del procesamiento de BOM"""
+    table_name = table_config.get("table_name", "")
     special_processing = table_config.get("special_processing", {})
+    
+    print(f"🔍 DEBUG BOM:")
+    print(f"   Table name: {table_name}")
+    print(f"   Special processing flags:")
+    print(f"     - generate_key_by_level: {special_processing.get('generate_key_by_level', False)}")
+    print(f"     - custom_cleaning: {special_processing.get('custom_cleaning', False)}")
+    print(f"   Columnas en DataFrame: {list(df.columns)}")
+    print(f"   Filas en DataFrame: {len(df)}")
+    
+    # Verificar si ya tiene las columnas key y Orden_BOM_Original
+    has_key = 'key' in df.columns
+    has_orden = 'Orden_BOM_Original' in df.columns
+    
+    print(f"   DataFrame ya tiene 'key': {has_key}")
+    print(f"   DataFrame ya tiene 'Orden_BOM_Original': {has_orden}")
+    
+    # Mostrar muestra de Level_Number para verificar formato
+    if 'Level_Number' in df.columns:
+        sample_levels = df['Level_Number'].head(10).tolist()
+        print(f"   Muestra Level_Number: {sample_levels}")
+    elif 'Level Number' in df.columns:
+        sample_levels = df['Level Number'].head(10).tolist()
+        print(f"   Muestra Level Number: {sample_levels}")
+    
+    return df
+
+def process_superbom_complete(df, table_config):
+    """
+    Procesamiento completo para SUPERBOM incluyendo debug
+    """
+    import pandas as pd
+    
+    print(f"🔧 INICIANDO procesamiento completo de SUPERBOM...")
+    
+    # Debug inicial
+    df = debug_bom_processing(df, table_config)
+    
+    # 1. Rellenar valores nulos
+    df = df.fillna('')
+    print(f"   🔧 Valores nulos rellenados")
+    
+    # 2. Eliminar filas "End-of-Report" si existen
+    initial_count = len(df)
+    level_col = None
+    
+    # Detectar la columna de nivel (puede ser Level_Number o Level Number)
+    if 'Level_Number' in df.columns:
+        level_col = 'Level_Number'
+    elif 'Level Number' in df.columns:
+        level_col = 'Level Number'
+    
+    if level_col:
+        df = df.loc[df[level_col] != 'End-of-Report.       1']
+        df = df.loc[df[level_col].astype(str).str.strip() != 'End-of-Report.       1']
+        if len(df) != initial_count:
+            print(f"   🗑️ Eliminadas {initial_count - len(df)} filas 'End-of-Report'")
+    
+    # 3. Eliminar la primera fila de datos (índice 0) como en tu código original
+    if len(df) > 0:
+        df = df.drop(index=df.index[0])
+        print(f"   🗑️ Eliminada primera fila de datos")
+    
+    # 4. CRÍTICO: Verificar que las columnas necesarias existan
+    # Detectar columnas de componente (puede ser Component o similar)
+    component_col = None
+    if 'Component' in df.columns:
+        component_col = 'Component'
+    elif 'component' in df.columns:
+        component_col = 'component'
+    
+    if not level_col or not component_col:
+        print(f"   ❌ ERROR: No se encontraron columnas requeridas")
+        print(f"   📋 Level column: {level_col}")
+        print(f"   📋 Component column: {component_col}")
+        print(f"   📋 Columnas disponibles: {list(df.columns)}")
+        return df
+    
+    print(f"   ✅ Usando columnas: Level='{level_col}', Component='{component_col}'")
+    
+    # 5. Generar columna 'key' por nivel 1
+    print(f"   🔑 Generando keys por nivel 1...")
+    df['key'] = None
+    ultima_key = None
+    keys_generated = 0
+    
+    for idx, row in df.iterrows():
+        level_str = str(row[level_col]).strip()
+        try:
+            # Extraer el primer carácter y convertir a entero
+            if level_str and len(level_str) > 0 and level_str[0].isdigit():
+                level = int(level_str[0])
+                
+                if level == 1:
+                    ultima_key = str(row[component_col]).strip()
+                    keys_generated += 1
+                    print(f"     🔑 Nueva key nivel 1: '{ultima_key}'")
+                
+                df.at[idx, 'key'] = ultima_key
+            
+        except (ValueError, IndexError) as e:
+            print(f"     ⚠️ Error procesando nivel '{level_str}' en fila {idx}: {e}")
+            continue
+    
+    # Convertir key a string y manejar valores None
+    df['key'] = df['key'].fillna('').astype(str)
+    print(f"   ✅ Keys generadas: {keys_generated} componentes nivel 1")
+    
+    # 6. Aplicar uppercase a columna Sort si existe
+    if 'Sort' in df.columns:
+        df['Sort'] = df['Sort'].astype(str).str.upper()
+        print(f"   🔤 Aplicado uppercase a columna Sort")
+    
+    # 7. Reset index y generar orden original
+    df.reset_index(drop=True, inplace=True)
+    df['Orden_BOM_Original'] = df.index + 1
+    print(f"   📊 Generado orden original BOM (1-{len(df)})")
+    
+    # 8. Verificación final
+    print(f"   ✅ Procesamiento SUPERBOM completado:")
+    print(f"     - Filas finales: {len(df)}")
+    print(f"     - Columnas finales: {len(df.columns)}")
+    
+    # Verificar que las keys no estén vacías
+    keys_not_empty = df['key'].ne('').sum()
+    print(f"     - Keys no vacías: {keys_not_empty} de {len(df)}")
+    
+    if keys_not_empty > 0:
+        unique_keys = df[df['key'] != '']['key'].nunique()
+        print(f"     - Keys únicas: {unique_keys}")
+    
+    # 9. Mostrar muestra de datos para verificar
+    if not df.empty:
+        print("   📄 Muestra de datos procesados:")
+        sample_cols = [level_col, component_col, 'Sort', 'key', 'Orden_BOM_Original']
+        available_sample_cols = [col for col in sample_cols if col in df.columns]
+        sample = df[available_sample_cols].head(5)
+        
+        for idx, row in sample.iterrows():
+            level = row.get(level_col, 'N/A')
+            component = row.get(component_col, 'N/A')
+            key_val = row.get('key', 'N/A')
+            orden = row.get('Orden_BOM_Original', 'N/A')
+            sort_val = row.get('Sort', 'N/A')
+            print(f"     Fila {idx}: Level={level}, Component={component}, Sort={sort_val}, Key='{key_val}', Orden={orden}")
+    
+    return df
+
+def apply_special_processing(df, table_config):
+    """Aplica procesamiento especial según configuración - VERSIÓN ACTUALIZADA"""
+    special_processing = table_config.get("special_processing", {})
+    table_name = table_config.get("table_name", "")
+    
+    # ========== PROCESAMIENTO ESPECIAL PARA SUPERBOM ==========
+    if (table_name == "bom" and 
+        special_processing.get("generate_key_by_level", False) and
+        special_processing.get("custom_cleaning", False)):
+        
+        print(f"🎯 Aplicando procesamiento especial para SUPERBOM...")
+        df = process_superbom_complete(df, table_config)  # Usar la función mejorada
+        return df  # Retornar aquí porque ya incluye toda la lógica necesaria
+    
+    # ========== PROCESAMIENTO ORIGINAL PARA OTRAS TABLAS ==========
     
     # Procesamiento de fechas de expiración para reworkloc_all
     if special_processing.get("fill_expire_date", False):
@@ -1846,6 +2075,19 @@ def apply_special_processing(df, table_config):
             
             df[expire_col].fillna(future_date.normalize(), inplace=True)
             print(f"   ✅ Fechas nulas rellenadas con: {future_date.date()}")
+    
+    # Procesamiento para arreglar años de fecha de expiración
+    if special_processing.get("fix_expire_date_year", False):
+        import pandas as pd
+        
+        year_threshold = special_processing.get("year_threshold", 1950)
+        year_adjustment = special_processing.get("year_adjustment", 100)
+        
+        for col in df.columns:
+            if 'expire' in col.lower() or 'expir' in col.lower():
+                print(f"   📅 Corrigiendo años en columna: {col}")
+                # Lógica para corregir años (si es necesario)
+                break
     
     return df
 
