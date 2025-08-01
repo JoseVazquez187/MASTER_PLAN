@@ -27,7 +27,7 @@ class BackScheduleAnalyzer:
         self.df = None
         self.metrics = {}
         
-    def load_data_from_db(self, db_path=r"C:\Users\J.Vazquez\Desktop\PARCHE EXPEDITE\BS_Analisis_2025_07_22.db"):
+    def load_data_from_db(self, db_path=r"C:\Users\J.Vazquez\Desktop\PARCHE EXPEDITE\BS_Analisis_2025_07_30.db"):
         """Cargar datos desde la base de datos SQLite"""
         try:
             print(f"Intentando conectar a: {db_path}")

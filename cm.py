@@ -31,8 +31,7 @@ class DataManager:
             SELECT SO_No, Ln, Cust_PO, Req_Dt, Spr_CD, ML, 
             Item_Number, Description, PlanType, Opn_Q, Issue_Q, OH_Netable
             FROM sales_order_table 
-            WHERE Ord_Cd IN ('M20', 'M55') 
-            AND Opn_Q > 0
+            WHERE Opn_Q > 0
             """
             so_df = pd.read_sql_query(so_query, conn)
             so_df['SO_Line'] = so_df['SO_No'].astype(str) + '-' + so_df['Ln'].astype(str)

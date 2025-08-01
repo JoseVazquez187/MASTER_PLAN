@@ -1116,7 +1116,7 @@ TABLES_CONFIG = {
     "table_name": "pr561",
     "file_type": "fixed_width",
     "fixed_width_params": {
-        "widths": [2, 10, 7, 32, 14, 30, 9, 3, 16, 13, 12, 14, 12, 12, 14, 9],
+        "widths": [2, 10, 7, 32, 14, 30, 9, 3, 16, 13, 12, 14, 12, 12, 14, 9,30,2,12],
         "header": 3,
         "skip_rows": [0]
     },
@@ -1133,15 +1133,17 @@ TABLES_CONFIG = {
         'Qty-Issue': 'QtyIssue',
         'Qty-no-Iss': 'QtyPending',
         'Qty-Required': 'ReqQty',
-        'Wo-No': 'WoNo'
+        'Wo-No': 'WoNo','WO-Descripton':'WODescripton','St':'St','Req-Date':'ReqDate'
     },
     "columns_order_original": [
         'In', 'Entity', 'Project', 'Component', 'Fuse-No', 'Component Description',
-        'PlnType', 'Srt', 'Qty-Oh', 'Qty-Issue', 'Qty-no-Iss', 'Qty-Required', 'Wo-No'
+        'PlnType', 'Srt', 'Qty-Oh', 'Qty-Issue', 'Qty-no-Iss'
+        , 'Qty-Required', 'Wo-No','WO-Descripton','St','Req-Date'
     ],
     "columns_order_renamed": [
         'Entity', 'Project', 'Component', 'FuseNo', 'Description',
-        'PlnType', 'Srt', 'QtyOh', 'QtyIssue', 'QtyPending', 'ReqQty', 'WoNo'
+        'PlnType', 'Srt', 'QtyOh', 'QtyIssue', 'QtyPending'
+        , 'ReqQty', 'WoNo','WODescripton','St','ReqDate'
     ],
     "special_processing": {
         "clear_before_insert": True,
@@ -1161,7 +1163,10 @@ TABLES_CONFIG = {
         QtyIssue TEXT,
         QtyPending TEXT,
         ReqQty TEXT,
-        WoNo TEXT
+        WoNo TEXT,
+        WODescripton TEXT, 
+        St text,
+        ReqDate TEXT
     )"""
 },
 # ==================== TABLA Credit Memos ====================
@@ -1528,12 +1533,78 @@ TABLES_CONFIG = {
         Tool_TaktTime TEXT,
         WO TEXT
     )"""
+},
+
+
+# ==================== TABLA OPERATION WO====================
+"Operation_WO": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\PR 5 56\PR556.txt",
+    "table_name": "Operation_WO",
+    "file_type": "fixed_width",
+    "fixed_width_params": {
+        "widths": [9,31,21,4,4,9,11,11,7,9,9,8,11,7,15],
+        "header": 3,
+        "skip_rows": [0]
+    },
+    "data_filters": {
+        "exclude_rows_multiple": {
+            "column": "WO-No",
+            "values": ["End-of-Re"]
+        }
+    },
+    "columns_mapping": {
+        'WO-No': 'WONo',
+        'Item-No': 'ItemNo',
+        'Description': 'Description',
+        'UM': 'UM',
+        'Seq': 'Seq',
+        'Op-ID': 'OpID',
+        'Start-Date': 'StartDate'
+        ,'End-Date':'EndDate','WrkCtr':'WrkCtr'
+        ,'Qty-Std':'QtyStd'
+        ,'Qty-Act':'QtyAct'
+        ,'WO-Qty':'WOQty'
+        ,'Due-Date':'DueDate','Status':'Status','Prj':'Prj'
+    },
+    "columns_order_original": [
+        'WO-No', 'Item-No', 'Description', 'UM', 'Seq', 'Op-ID', 'Start-Date',
+        'End-Date', 'WrkCtr', 'Qty-Std', 'Qty-Act', 'WO-Qty', 'Due-Date',
+        'Status', 'Prj'
+    ],
+    "columns_order_renamed": [
+        'WONo', 'ItemNo', 'Description', 'UM','Seq','OpID'
+        ,'StartDate','EndDate','WrkCtr','QtyStd','QtyAct','WOQty','DueDate','Status','Prj'
+    ],
+    "special_processing": {
+        "clear_before_insert": True,
+        "custom_cleaning": False,
+        "final_columns_only": True
+    },
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS Operation_WO(
+                            id INTEGER PRIMARY KEY,
+                            WONo TEXT,
+                            ItemNo TEXT,
+                            Description TEXT,
+                            UM TEXT,
+                            Seq TEXT,
+                            OpID TEXT,
+                            StartDate TEXT,
+                            EndDate TEXT,
+                            WrkCtr TEXT,
+                            QtyStd TEXT,
+                            QtyAct TEXT,
+                            WOQty TEXT,
+                            DueDate TEXT, 
+                            Status text,
+                            Prj TEXT
+                        )"""
 }
 }
 
 # Rutas globales usando raw strings para evitar problemas con backslashes
 BASE_PATHS = {
     "db_folder": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database",
+    # "db_folder": r"C:\Users\J.Vazquez\Desktop\R4Database.db",
     "source_folder": r"J:\Departments\Material Control\Purchasing\Tools\ComprasDB",
     "tracking_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\file_tracking.json"
 }

@@ -138,7 +138,7 @@ class KiteoDashboard:
                                          'Rev', 'UM', 'Proj']
                 
                 propuesta_final['WO_Count'] = propuesta_final['WO_List'].apply(len)
-                propuesta_final['WO_String'] = propuesta_final['WO_List'].apply(lambda x: ', '.join(map(str, x)))
+                propuesta_final['WO_String'] = propuesta_final['WO_List'].apply(lambda x: ','.join(map(str, x)))
                 propuesta_final = propuesta_final.reset_index(drop=True)
                 propuesta_final['Group_ID'] = range(1, len(propuesta_final) + 1)
                 

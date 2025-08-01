@@ -28,7 +28,7 @@ path_oh_db = os.path.join(compras_db_folder, "compras_DB.db")
 coverage_folder = os.path.join(desktop_path, "Coverage")
 if not os.path.exists(coverage_folder):
     os.makedirs(coverage_folder)
-output_db = os.path.join(coverage_folder, "CoberturaMateriales.db")
+output_db = os.path.join(coverage_folder, "CoberturaMaterialesV2.db")
 
 # === Obtener OH ===
 def get_oh_information():

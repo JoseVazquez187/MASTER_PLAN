@@ -45,7 +45,7 @@ df_lt["LT_TOTAL"] = pd.to_numeric(df_lt["LT_TOTAL"], errors="coerce")
 df_lt = df_lt.groupby("KEY_UNICA", as_index=False).agg({"LT_TOTAL": "max"})
 
 # === Leer Expedite ===
-df_exp = pd.read_csv(expedite_path)
+df_exp = pd.read_csv(expedite_path,skiprows = 1)
 df_exp.columns = df_exp.columns.str.strip()
 
 column_map = {
