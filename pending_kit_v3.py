@@ -23,7 +23,10 @@ COLORS = {
 
 class InventoryDashboard:
     def __init__(self):
-        self.db_path = r"C:\Users\J.Vazquez\Desktop\R4Database.db"
+        # self.db_path = r"C:\Users\J.Vazquez\Desktop\R4Database.db"
+        self.db_path = r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"
+        
+        
         self.df_original = None
         self.df_costs = None
         self.df_filtered = None
@@ -566,932 +569,8 @@ def create_export_card(dashboard, page):
         elevation=8
     )
 
-
-# def create_wo_clear_tab(dashboard):
-#     """Crear tab para visualizar Work Orders Clear con tabla 80% y registro de WOs"""
-    
-#     # Estados para filtros
-#     selected_wo = ft.Ref[ft.Dropdown]()
-#     selected_project = ft.Ref[ft.Dropdown]()
-#     selected_entity = ft.Ref[ft.Dropdown]()
-#     wo_clear_metrics = ft.Ref[ft.Column]()
-#     pareto_image = ft.Ref[ft.Image]()
-#     pareto_container = ft.Ref[ft.Container]()
-    
-#     # NUEVOS: Referencias para tabla 80% y registro de WOs
-#     top_80_table = ft.Ref[ft.DataTable]()
-#     wo_entry = ft.Ref[ft.TextField]()
-#     register_status = ft.Ref[ft.Text]()
-#     register_button = ft.Ref[ft.ElevatedButton]()
-#     wo_notes = ft.Ref[ft.TextField]()  # NUEVO: Campo de notas
-#     download_button = ft.Ref[ft.ElevatedButton]()  # NUEVO: Botón de descarga
-    
-#     # NUEVOS: Referencias para búsqueda de materiales WO
-#     wo_search_entry = ft.Ref[ft.TextField]()
-#     wo_search_button = ft.Ref[ft.ElevatedButton]()
-#     wo_search_status = ft.Ref[ft.Text]()
-#     wo_materials_table = ft.Ref[ft.DataTable]()
-#     wo_materials_container = ft.Ref[ft.Container]()
-    
-#     # NUEVOS: Referencias para tabla WOInquiry
-#     wo_inquiry_table = ft.Ref[ft.DataTable]()
-#     wo_inquiry_container = ft.Ref[ft.Container]()
-#     wo_inquiry_status = ft.Ref[ft.Text]()
-    
-#     def create_wo_clear_checked_table():
-#         """Crear tabla WOClear_checked si no existe"""
-#         try:
-#             conn = sqlite3.connect(dashboard.db_path)
-#             create_table_sql = """
-#             CREATE TABLE IF NOT EXISTS WOClear_checked (
-#                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-#                 WoNo TEXT UNIQUE,
-#                 checked_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-#                 user_action TEXT DEFAULT 'PENDING',
-#                 notes TEXT
-#             )
-#             """
-#             conn.execute(create_table_sql)
-#             conn.commit()
-#             conn.close()
-#             return True
-#         except Exception as e:
-#             print(f"Error creando tabla WOClear_checked: {e}")
-#             return False
-    
-#     def search_wo_inquiry_data(wo_number):
-#         """Buscar WOs relacionadas en tabla WOInquiry"""
-#         try:
-#             conn = sqlite3.connect(dashboard.db_path)
-            
-#             # Consultar WOInquiry buscando en WONo y ParentWO - COLUMNAS CORREGIDAS
-#             query = """
-#             SELECT Entity, ProjectNo, WONo, SO_FCST, Sub, ParentWO, ItemNumber, Rev, 
-#                    Description, AC, DueDt, CreateDt, WoType, Srt, PlanType, St
-#             FROM WOInquiry 
-#             WHERE WONo = ? OR ParentWO = ?
-#             ORDER BY WONo, CreateDt
-#             """
-            
-#             df_wo_inquiry = pd.read_sql_query(query, conn, params=[wo_number, wo_number])
-#             conn.close()
-            
-#             return df_wo_inquiry
-            
-#         except Exception as e:
-#             print(f"Error consultando WOInquiry: {e}")
-#             return pd.DataFrame()
-    
-#     def update_wo_inquiry_table(df_wo_inquiry, searched_wo):
-#         """Actualizar tabla de WOInquiry"""
-#         wo_inquiry_table.current.rows.clear()
-        
-#         if len(df_wo_inquiry) == 0:
-#             wo_inquiry_status.current.value = f"⚠️ No se encontraron WOs relacionadas para: {searched_wo}"
-#             wo_inquiry_status.current.color = COLORS['warning']
-#             wo_inquiry_container.current.visible = False
-#         else:
-#             for _, row in df_wo_inquiry.iterrows():
-#                 # Determinar color del status usando St (Status)
-#                 wo_status = str(row['St']) if pd.notna(row['St']) else "Sin Estado"
-#                 if wo_status.upper() in ['COMPLETED', 'CLOSED', 'FINISHED', 'C']:
-#                     status_color = COLORS['success']
-#                 elif wo_status.upper() in ['ACTIVE', 'OPEN', 'IN PROGRESS', 'A', 'O']:
-#                     status_color = COLORS['accent']
-#                 else:
-#                     status_color = COLORS['warning']
-                
-#                 wo_inquiry_table.current.rows.append(
-#                     ft.DataRow(
-#                         cells=[
-#                             ft.DataCell(ft.Text(str(row['Entity']) if pd.notna(row['Entity']) else "-", color=COLORS['text_primary'], selectable=True)),
-#                             ft.DataCell(ft.Text(str(row['ProjectNo']) if pd.notna(row['ProjectNo']) else "-", color=COLORS['text_primary'], selectable=True)),
-#                             ft.DataCell(ft.Text(str(row['WONo']), color=COLORS['accent'], selectable=True)),
-#                             ft.DataCell(ft.Text(str(row['SO_FCST']) if pd.notna(row['SO_FCST']) else "-", color=COLORS['text_primary'], selectable=True)),
-#                             ft.DataCell(ft.Text(str(row['Sub']) if pd.notna(row['Sub']) else "-", color=COLORS['text_primary'], selectable=True)),
-#                             ft.DataCell(ft.Text(str(row['ParentWO']) if pd.notna(row['ParentWO']) else "-", color=COLORS['text_secondary'], selectable=True)),
-#                             ft.DataCell(ft.Text(str(row['ItemNumber']) if pd.notna(row['ItemNumber']) else "-", color=COLORS['text_primary'], selectable=True)),
-#                             ft.DataCell(ft.Text(str(row['Description']) if pd.notna(row['Description']) else "-", color=COLORS['text_secondary'], selectable=True)),
-#                             ft.DataCell(ft.Text(str(row['DueDt'])[:10] if pd.notna(row['DueDt']) else "-", color=COLORS['text_primary'], selectable=True)),
-#                             ft.DataCell(ft.Text(str(row['WoType']) if pd.notna(row['WoType']) else "-", color=COLORS['text_secondary'], selectable=True)),
-#                             ft.DataCell(ft.Text(wo_status, color=status_color, selectable=True)),
-#                         ]
-#                     )
-#                 )
-            
-#             # Actualizar status
-#             total_wos = len(df_wo_inquiry)
-#             related_wos = len(df_wo_inquiry[df_wo_inquiry['ParentWO'] == searched_wo])
-#             direct_wos = len(df_wo_inquiry[df_wo_inquiry['WONo'] == searched_wo])
-            
-#             wo_inquiry_status.current.value = f"✅ Encontradas {total_wos} WOs | {direct_wos} directas | {related_wos} relacionadas"
-#             wo_inquiry_status.current.color = COLORS['success']
-#             wo_inquiry_container.current.visible = True
-        
-#         wo_inquiry_table.current.update()
-#         wo_inquiry_container.current.update()
-#         wo_inquiry_status.current.update()
-    
-#     def search_wo_materials(e):
-#         """Buscar todos los materiales de una WO desde tabla PR561 y WOs relacionadas desde WOInquiry"""
-#         wo_number = wo_search_entry.current.value.strip() if wo_search_entry.current.value else ""
-        
-#         if not wo_number:
-#             wo_search_status.current.value = "❌ Ingresa un número de WO"
-#             wo_search_status.current.color = COLORS['error']
-#             wo_search_status.current.update()
-#             return
-        
-#         wo_search_button.current.text = "🔍 Buscando..."
-#         wo_search_button.current.disabled = True
-#         wo_search_status.current.value = "🔄 Consultando base de datos..."
-#         wo_search_status.current.color = COLORS['text_secondary']
-#         wo_search_button.current.update()
-#         wo_search_status.current.update()
-        
-#         try:
-#             conn = sqlite3.connect(dashboard.db_path)
-            
-#             # Consultar materiales de la WO desde PR561 con costos de IN92
-#             query = """
-#             SELECT pr.Component, pr.ReqDate, 
-#                    CAST(COALESCE(pr.QtyOh, 0) AS REAL) as QtyOh,
-#                    CAST(COALESCE(pr.ReqQty, 0) AS REAL) as ReqQty,
-#                    CAST(COALESCE(pr.QtyPending, 0) AS REAL) as QtyPending,
-#                    pr.Srt, pr.Project, pr.Entity, pr.Description,
-#                    CAST(COALESCE(in92.STDCost, 0) AS REAL) as STDCost
-#             FROM pr561 pr 
-#             LEFT JOIN in92 ON pr.Component = in92.ItemNo 
-#             WHERE pr.WoNo = ?
-#             ORDER BY pr.ReqDate, pr.Component
-#             """
-            
-#             df_materials = pd.read_sql_query(query, conn, params=[wo_number])
-#             conn.close()
-            
-#             if len(df_materials) == 0:
-#                 wo_search_status.current.value = f"⚠️ No se encontraron materiales para WO: {wo_number}"
-#                 wo_search_status.current.color = COLORS['warning']
-#                 wo_materials_container.current.visible = False
-#                 wo_inquiry_container.current.visible = False
-#                 wo_materials_container.current.update()
-#                 wo_inquiry_container.current.update()
-#             else:
-#                 # Limpiar tabla anterior
-#                 wo_materials_table.current.rows.clear()
-                
-#                 # Asegurar tipos numéricos
-#                 df_materials['QtyOh'] = pd.to_numeric(df_materials['QtyOh'], errors='coerce').fillna(0)
-#                 df_materials['ReqQty'] = pd.to_numeric(df_materials['ReqQty'], errors='coerce').fillna(0)
-#                 df_materials['QtyPending'] = pd.to_numeric(df_materials['QtyPending'], errors='coerce').fillna(0)
-#                 df_materials['STDCost'] = pd.to_numeric(df_materials['STDCost'], errors='coerce').fillna(0)
-                
-#                 # Calcular valores
-#                 df_materials['Valor_Pendiente'] = df_materials['QtyPending'] * df_materials['STDCost']
-#                 df_materials['Valor_Total'] = df_materials['ReqQty'] * df_materials['STDCost']
-                
-#                 # Llenar tabla con materiales encontrados
-#                 for _, row in df_materials.iterrows():
-#                     # Determinar color del status
-#                     qty_pending = float(row['QtyPending'])
-#                     if qty_pending == 0:
-#                         status_color = COLORS['success']
-#                         status_text = "Surtido"
-#                     else:
-#                         status_color = COLORS['warning']
-#                         status_text = "Pendiente"
-                    
-#                     wo_materials_table.current.rows.append(
-#                         ft.DataRow(
-#                             cells=[
-#                                 ft.DataCell(ft.Text(str(row['Component']), color=COLORS['text_primary'], selectable=True)),
-#                                 ft.DataCell(ft.Text(str(row['ReqDate'])[:10], color=COLORS['text_primary'], selectable=True)),
-#                                 ft.DataCell(ft.Text(f"{float(row['QtyOh']):,.0f}", color=COLORS['text_primary'], selectable=True)),
-#                                 ft.DataCell(ft.Text(f"{float(row['ReqQty']):,.0f}", color=COLORS['accent'], selectable=True)),
-#                                 ft.DataCell(ft.Text(f"{qty_pending:,.0f}", color=status_color, selectable=True)),
-#                                 ft.DataCell(ft.Text(status_text, color=status_color, selectable=True)),
-#                                 ft.DataCell(ft.Text(f"${float(row['STDCost']):,.2f}", color=COLORS['text_primary'], selectable=True)),
-#                                 ft.DataCell(ft.Text(f"${float(row['Valor_Pendiente']):,.2f}", color=COLORS['error'], selectable=True)),
-#                                 ft.DataCell(ft.Text(f"${float(row['Valor_Total']):,.2f}", color=COLORS['success'], selectable=True)),
-#                                 ft.DataCell(ft.Text(str(row['Srt']) if pd.notna(row['Srt']) and str(row['Srt']) != 'nan' else "-", color=COLORS['text_secondary'], selectable=True)),
-#                             ]
-#                         )
-#                     )
-                
-#                 # Calcular resumen de materiales
-#                 total_components = len(df_materials)
-#                 pending_components = len(df_materials[df_materials['QtyPending'] > 0])
-#                 total_value_pending = float(df_materials['Valor_Pendiente'].sum())
-#                 total_value_all = float(df_materials['Valor_Total'].sum())
-                
-#                 wo_search_status.current.value = f"✅ Encontrados {total_components} componentes | {pending_components} pendientes | Valor pendiente: ${total_value_pending:,.2f}"
-#                 wo_search_status.current.color = COLORS['success']
-#                 wo_materials_container.current.visible = True
-                
-#                 # NUEVO: Buscar WOs relacionadas en WOInquiry
-#                 df_wo_inquiry = search_wo_inquiry_data(wo_number)
-#                 update_wo_inquiry_table(df_wo_inquiry, wo_number)
-                
-#                 wo_materials_table.current.update()
-#                 wo_materials_container.current.update()
-            
-#         except Exception as e:
-#             wo_search_status.current.value = f"❌ Error: {str(e)}"
-#             wo_search_status.current.color = COLORS['error']
-#             wo_materials_container.current.visible = False
-#             wo_inquiry_container.current.visible = False
-#             wo_materials_container.current.update()
-#             wo_inquiry_container.current.update()
-#             print(f"Error detallado en search_wo_materials: {e}")
-        
-#         wo_search_button.current.text = "🔍 Buscar Materiales"
-#         wo_search_button.current.disabled = False
-#         wo_search_button.current.update()
-#         wo_search_status.current.update()
-    
-#     def download_wo_clear_checked(e):
-#         """Descargar tabla WOClear_checked a Excel"""
-#         download_button.current.text = "⏳ Descargando..."
-#         download_button.current.disabled = True
-#         download_button.current.update()
-        
-#         try:
-#             conn = sqlite3.connect(dashboard.db_path)
-            
-#             # Consultar todos los registros de WOClear_checked
-#             query = """
-#             SELECT WoNo, checked_date, user_action, notes, 
-#                    datetime(checked_date, 'localtime') as fecha_registro
-#             FROM WOClear_checked 
-#             ORDER BY checked_date DESC
-#             """
-            
-#             df_wo_checked = pd.read_sql_query(query, conn)
-#             conn.close()
-            
-#             if len(df_wo_checked) == 0:
-#                 register_status.current.value = "⚠️ No hay registros en WOClear_checked para descargar"
-#                 register_status.current.color = COLORS['warning']
-#             else:
-#                 # Crear nombre de archivo con timestamp
-#                 from datetime import datetime
-#                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-#                 filename = f"WOClear_Checked_{timestamp}.xlsx"
-                
-#                 # Renombrar columnas para mejor presentación
-#                 df_wo_checked.columns = [
-#                     'Número WO', 'Fecha Registro (UTC)', 'Acción Usuario', 
-#                     'Notas', 'Fecha Registro (Local)'
-#                 ]
-                
-#                 # Exportar a Excel
-#                 df_wo_checked.to_excel(filename, index=False, engine='openpyxl')
-                
-#                 register_status.current.value = f"✅ Descargado: {filename} ({len(df_wo_checked)} registros)"
-#                 register_status.current.color = COLORS['success']
-                
-#         except Exception as e:
-#             register_status.current.value = f"❌ Error descargando: {str(e)}"
-#             register_status.current.color = COLORS['error']
-#             print(f"Error detallado en descarga: {e}")
-        
-#         download_button.current.text = "📥 Descargar Excel"
-#         download_button.current.disabled = False
-#         download_button.current.update()
-#         register_status.current.update()
-    
-#     def register_wo_checked(e):
-#         """Registrar WO en tabla WOClear_checked con notas"""
-#         wo_number = wo_entry.current.value.strip() if wo_entry.current.value else ""
-#         notes = wo_notes.current.value.strip() if wo_notes.current.value else ""
-        
-#         if not wo_number:
-#             register_status.current.value = "❌ Ingresa un número de WO"
-#             register_status.current.color = COLORS['error']
-#             register_status.current.update()
-#             return
-        
-#         register_button.current.text = "⏳ Registrando..."
-#         register_button.current.disabled = True
-#         register_button.current.update()
-        
-#         try:
-#             # Crear tabla si no existe
-#             create_wo_clear_checked_table()
-            
-#             conn = sqlite3.connect(dashboard.db_path)
-            
-#             # Verificar si la WO existe en WOClear
-#             check_wo_query = "SELECT COUNT(*) FROM WOClear WHERE WoNo = ?"
-#             wo_exists = conn.execute(check_wo_query, (wo_number,)).fetchone()[0] > 0
-            
-#             if not wo_exists:
-#                 register_status.current.value = f"⚠️ WO {wo_number} no existe en WOClear"
-#                 register_status.current.color = COLORS['warning']
-#             else:
-#                 # Insertar o actualizar registro con notas
-#                 insert_query = """
-#                 INSERT OR REPLACE INTO WOClear_checked (WoNo, checked_date, user_action, notes)
-#                 VALUES (?, CURRENT_TIMESTAMP, 'REGISTERED', ?)
-#                 """
-#                 conn.execute(insert_query, (wo_number, notes))
-#                 conn.commit()
-                
-#                 register_status.current.value = f"✅ WO {wo_number} registrada exitosamente"
-#                 register_status.current.color = COLORS['success']
-#                 wo_entry.current.value = ""  # Limpiar campo WO
-#                 wo_notes.current.value = ""  # Limpiar campo notas
-#                 wo_entry.current.update()
-#                 wo_notes.current.update()
-            
-#             conn.close()
-            
-#         except sqlite3.IntegrityError:
-#             register_status.current.value = f"⚠️ WO {wo_number} ya está registrada"
-#             register_status.current.color = COLORS['warning']
-#         except Exception as e:
-#             register_status.current.value = f"❌ Error: {str(e)}"
-#             register_status.current.color = COLORS['error']
-        
-#         register_button.current.text = "📝 Registrar WO"
-#         register_button.current.disabled = False
-#         register_button.current.update()
-#         register_status.current.update()
-    
-#     def get_top_80_wos_data(pareto_data):
-#         """Obtener el 80% de las WOs más costosas con información adicional de WOInquiry"""
-#         if pareto_data is None or len(pareto_data) == 0:
-#             return pd.DataFrame()
-        
-#         # Calcular cuántas WOs representan el 80%
-#         cumulative_80_idx = pareto_data[pareto_data['Pct_Acumulado'] <= 80].index
-#         if len(cumulative_80_idx) == 0:
-#             # Si ninguna llega al 80%, tomar al menos el top 20%
-#             top_80_count = max(1, int(len(pareto_data) * 0.2))
-#         else:
-#             top_80_count = cumulative_80_idx[-1] + 1
-        
-#         # Obtener datos del 80%
-#         top_80_data = pareto_data.head(top_80_count).copy()
-        
-#         # NUEVO: Enriquecer con datos de WOInquiry
-#         try:
-#             conn = sqlite3.connect(dashboard.db_path)
-            
-#             # Obtener información adicional de WOInquiry para cada WO
-#             wo_info = {}
-#             for _, row in top_80_data.iterrows():
-#                 wo_number = str(row['WoNo'])
-                
-#                 query = """
-#                 SELECT ItemNumber, Description 
-#                 FROM WOInquiry 
-#                 WHERE WONo = ? 
-#                 LIMIT 1
-#                 """
-                
-#                 result = pd.read_sql_query(query, conn, params=[wo_number])
-                
-#                 if len(result) > 0:
-#                     wo_info[wo_number] = {
-#                         'ItemNumber': str(result.iloc[0]['ItemNumber']) if pd.notna(result.iloc[0]['ItemNumber']) else "-",
-#                         'Description': str(result.iloc[0]['Description']) if pd.notna(result.iloc[0]['Description']) else "-"
-#                     }
-#                 else:
-#                     wo_info[wo_number] = {'ItemNumber': "-", 'Description': "-"}
-            
-#             conn.close()
-            
-#             # Agregar columnas de Item y Description
-#             top_80_data['ItemNumber'] = top_80_data['WoNo'].astype(str).map(lambda x: wo_info.get(x, {}).get('ItemNumber', '-'))
-#             top_80_data['Description'] = top_80_data['WoNo'].astype(str).map(lambda x: wo_info.get(x, {}).get('Description', '-'))
-            
-#         except Exception as e:
-#             print(f"Error enriqueciendo datos con WOInquiry: {e}")
-#             # Si hay error, agregar columnas vacías
-#             top_80_data['ItemNumber'] = "-"
-#             top_80_data['Description'] = "-"
-        
-#         return top_80_data
-    
-#     def load_wo_clear_data():
-#         """Cargar datos de WO Clear con filtros"""
-#         try:
-#             df_wo_clear = dashboard.load_wo_clear_from_db()
-            
-#             if len(df_wo_clear) == 0:
-#                 wo_clear_metrics.current.controls = [
-#                     ft.Container(
-#                         content=ft.Text("⚠️ No hay datos en tabla WOClear. Ejecuta el Dashboard Principal primero.", 
-#                                        size=16, color=COLORS['warning']),
-#                         padding=ft.padding.all(20),
-#                         bgcolor=COLORS['primary'],
-#                         border_radius=8
-#                     )
-#                 ]
-#                 # LIMPIAR TODAS LAS TABLAS cuando no hay datos
-#                 top_80_table.current.rows.clear()
-#                 wo_materials_table.current.rows.clear()
-#                 wo_inquiry_table.current.rows.clear()
-#                 wo_materials_container.current.visible = False
-#                 wo_inquiry_container.current.visible = False
-                
-#                 # Ocultar gráfico si no hay datos
-#                 pareto_container.current.visible = False
-                
-#                 wo_clear_metrics.current.update()
-#                 top_80_table.current.update()
-#                 wo_materials_table.current.update()
-#                 wo_inquiry_table.current.update()
-#                 wo_materials_container.current.update()
-#                 wo_inquiry_container.current.update()
-#                 pareto_container.current.update()
-#                 return
-            
-#             # Aplicar filtros
-#             df_filtered = df_wo_clear.copy()
-            
-#             if selected_wo.current and selected_wo.current.value and selected_wo.current.value != "Todas":
-#                 df_filtered = df_filtered[df_filtered['WoNo'] == selected_wo.current.value]
-            
-#             if selected_project.current and selected_project.current.value and selected_project.current.value != "Todos":
-#                 df_filtered = df_filtered[df_filtered['Project'] == selected_project.current.value]
-            
-#             if selected_entity.current and selected_entity.current.value and selected_entity.current.value != "Todas":
-#                 df_filtered = df_filtered[df_filtered['Entity'] == selected_entity.current.value]
-            
-#             # Actualizar métricas
-#             total_wos = len(df_filtered['WoNo'].unique()) if len(df_filtered) > 0 else 0
-#             total_components = len(df_filtered)
-#             total_value = df_filtered['Valor_Cubierto'].sum() if len(df_filtered) > 0 else 0
-            
-#             wo_clear_metrics.current.controls = [
-#                 ft.Row([
-#                     create_metric_card(
-#                         "WOs Clear Filtradas",
-#                         f"{total_wos:,}",
-#                         "Work Orders completamente cubiertas",
-#                         COLORS['success']
-#                     ),
-#                     create_metric_card(
-#                         "Componentes Totales",
-#                         f"{total_components:,}",
-#                         "Componentes en WOs filtradas",
-#                         COLORS['accent']
-#                     ),
-#                     create_metric_card(
-#                         "Valor Total",
-#                         f"${total_value:,.2f}",
-#                         "Valor de componentes cubiertos",
-#                         COLORS['success']
-#                     ),
-#                 ], wrap=True, spacing=15)
-#             ]
-            
-#             # Generar gráfico de Pareto
-#             pareto_data = dashboard.get_wo_clear_pareto_data()
-#             if pareto_data is not None and len(pareto_data) > 0:
-#                 chart_image_b64 = dashboard.create_pareto_chart(pareto_data)
-#                 if chart_image_b64:
-#                     pareto_image.current.src_base64 = chart_image_b64
-#                     pareto_container.current.visible = True
-                    
-#                     # Agregar información del análisis
-#                     top_80_count = len(pareto_data[pareto_data['Pct_Acumulado'] <= 80])
-#                     if top_80_count == 0:
-#                         top_80_count = min(3, len(pareto_data))  # Al menos mostrar top 3
-                    
-#                     top_80_value = pareto_data.head(top_80_count)['Total_Value'].sum()
-#                     total_pareto_value = pareto_data['Total_Value'].sum()
-#                     pareto_percentage = (top_80_value / total_pareto_value * 100) if total_pareto_value > 0 else 0
-                    
-#                     # Actualizar texto del análisis
-#                     analysis_text = f"""📈 Análisis 80/20: Top {top_80_count} WOs representan {pareto_percentage:.1f}% del valor total
-# 💰 Valor concentrado: ${top_80_value:,.0f} de ${total_pareto_value:,.0f} total
-# 🎯 WOs críticas: {', '.join(pareto_data.head(3)['WoNo'].astype(str))}"""
-                    
-#                     pareto_container.current.content.controls[1] = ft.Text(
-#                         analysis_text.strip(),
-#                         size=12, 
-#                         color=COLORS['text_secondary'],
-#                         text_align=ft.TextAlign.CENTER
-#                     )
-                    
-#                     # Actualizar tabla del 80%
-#                     update_top_80_table(pareto_data)
-#                 else:
-#                     pareto_container.current.visible = False
-#             else:
-#                 pareto_container.current.visible = False
-            
-#             # Limpiar tablas de materiales y WO inquiry
-#             wo_materials_table.current.rows.clear()
-#             wo_inquiry_table.current.rows.clear()
-#             wo_materials_container.current.visible = False
-#             wo_inquiry_container.current.visible = False
-            
-#             wo_clear_metrics.current.update()
-#             top_80_table.current.update()
-#             wo_materials_table.current.update()
-#             wo_inquiry_table.current.update()
-#             wo_materials_container.current.update()
-#             wo_inquiry_container.current.update()
-#             pareto_container.current.update()
-#             pareto_image.current.update()
-            
-#         except Exception as e:
-#             print(f"Error cargando WO Clear: {e}")
-    
-#     def update_top_80_table(pareto_data):
-#         """Actualizar tabla del 80% de WOs más costosas CON SCROLL"""
-#         top_80_data = get_top_80_wos_data(pareto_data)
-        
-#         # Limpiar tabla
-#         top_80_table.current.rows.clear()
-        
-#         for idx, row in top_80_data.iterrows():
-#             # Determinar color según posición en el ranking
-#             if row['Ranking'] <= 3:
-#                 ranking_color = COLORS['error']  # Top 3 en rojo
-#             elif row['Ranking'] <= 10:
-#                 ranking_color = COLORS['warning']  # Top 10 en amarillo
-#             else:
-#                 ranking_color = COLORS['success']  # Resto en verde
-            
-#             top_80_table.current.rows.append(
-#                 ft.DataRow(
-#                     cells=[
-#                         ft.DataCell(ft.Text(f"#{row['Ranking']}", color=ranking_color, weight=ft.FontWeight.BOLD, selectable=True)),
-#                         ft.DataCell(ft.Text(str(row['WoNo']), color=COLORS['text_primary'], selectable=True)),
-#                         ft.DataCell(ft.Text(f"${row['Total_Value']:,.0f}", color=COLORS['success'], selectable=True)),
-#                         ft.DataCell(ft.Text(f"{row['Pct_Individual']:.1f}%", color=COLORS['accent'], selectable=True)),
-#                         ft.DataCell(ft.Text(f"{row['Pct_Acumulado']:.1f}%", color=COLORS['text_secondary'], selectable=True)),
-#                         ft.DataCell(ft.Text(f"{row['Component_Count']}", color=COLORS['text_primary'], selectable=True)),
-#                         ft.DataCell(ft.Text(str(row['Project']) if row['Project'] else "-", color=COLORS['text_secondary'], selectable=True)),
-#                         ft.DataCell(ft.Text(str(row['ItemNumber']), color=COLORS['accent'], selectable=True)),  # NUEVA COLUMNA
-#                         ft.DataCell(ft.Text(str(row['Description'])[:30] + "..." if len(str(row['Description'])) > 30 else str(row['Description']), 
-#                                           color=COLORS['text_secondary'], selectable=True)),  # NUEVA COLUMNA
-#                     ]
-#                 )
-#             )
-    
-#     def on_filter_change(e):
-#         """Manejar cambio de filtros"""
-#         load_wo_clear_data()
-    
-#     def refresh_filters():
-#         """Actualizar opciones de filtros"""
-#         filters = dashboard.get_wo_clear_filters()
-        
-#         # Actualizar dropdown de WOs
-#         wo_options = [ft.dropdown.Option("Todas")] + [ft.dropdown.Option(wo) for wo in filters['wo_numbers']]
-#         selected_wo.current.options = wo_options
-        
-#         # Actualizar dropdown de Projects
-#         project_options = [ft.dropdown.Option("Todos")] + [ft.dropdown.Option(proj) for proj in filters['projects']]
-#         selected_project.current.options = project_options
-        
-#         # Actualizar dropdown de Entities
-#         entity_options = [ft.dropdown.Option("Todas")] + [ft.dropdown.Option(ent) for ent in filters['entities']]
-#         selected_entity.current.options = entity_options
-        
-#         selected_wo.current.update()
-#         selected_project.current.update()
-#         selected_entity.current.update()
-    
-#     # Crear controles
-#     filters_row = ft.Row([
-#         ft.Column([
-#             ft.Text("Work Order:", size=12, color=COLORS['text_secondary']),
-#             ft.Dropdown(
-#                 ref=selected_wo,
-#                 options=[ft.dropdown.Option("Todas")],
-#                 value="Todas",
-#                 width=200,
-#                 on_change=on_filter_change
-#             )
-#         ]),
-#         ft.Column([
-#             ft.Text("Project:", size=12, color=COLORS['text_secondary']),
-#             ft.Dropdown(
-#                 ref=selected_project,
-#                 options=[ft.dropdown.Option("Todos")],
-#                 value="Todos",
-#                 width=200,
-#                 on_change=on_filter_change
-#             )
-#         ]),
-#         ft.Column([
-#             ft.Text("Entity:", size=12, color=COLORS['text_secondary']),
-#             ft.Dropdown(
-#                 ref=selected_entity,
-#                 options=[ft.dropdown.Option("Todas")],
-#                 value="Todas",
-#                 width=200,
-#                 on_change=on_filter_change
-#             )
-#         ]),
-#         ft.ElevatedButton(
-#             "🔄 Actualizar",
-#             on_click=lambda _: (refresh_filters(), load_wo_clear_data()),
-#             bgcolor=COLORS['accent'],
-#             color=COLORS['text_primary']
-#         )
-#     ], spacing=20)
-    
-#     # Sección de registro de WOs CON CAMPO DE NOTAS Y BOTÓN DE DESCARGA
-#     wo_register_section = ft.Container(
-#         content=ft.Column([
-#             ft.Text("📝 Registrar WO para Acción", 
-#                    size=16, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
-#             ft.Text("Registra WOs que requieren seguimiento", 
-#                    size=12, color=COLORS['text_secondary']),
-#             ft.Row([
-#                 ft.TextField(
-#                     ref=wo_entry,
-#                     label="Número de WO",
-#                     hint_text="Ej: WO-2024-001",
-#                     width=200,
-#                     bgcolor=COLORS['secondary'],
-#                     color=COLORS['text_primary']
-#                 ),
-#                 ft.ElevatedButton(
-#                     "📝 Registrar WO",
-#                     ref=register_button,
-#                     on_click=register_wo_checked,
-#                     bgcolor=COLORS['success'],
-#                     color=COLORS['text_primary'],
-#                     icon=ft.Icons.CHECK_CIRCLE
-#                 ),
-#                 ft.ElevatedButton(
-#                     "📥 Descargar Excel",
-#                     ref=download_button,
-#                     on_click=download_wo_clear_checked,
-#                     bgcolor=COLORS['warning'],
-#                     color=COLORS['text_primary'],
-#                     icon=ft.Icons.DOWNLOAD
-#                 )
-#             ], spacing=10),
-#             # Campo de notas
-#             ft.TextField(
-#                 ref=wo_notes,
-#                 label="Notas (Opcional)",
-#                 hint_text="Agregar comentarios o acciones a realizar...",
-#                 multiline=True,
-#                 min_lines=2,
-#                 max_lines=4,
-#                 bgcolor=COLORS['secondary'],
-#                 color=COLORS['text_primary']
-#             ),
-#             ft.Text("", ref=register_status, size=12)
-#         ], spacing=10),
-#         padding=ft.padding.all(15),
-#         bgcolor=COLORS['primary'],
-#         border_radius=8,
-#         border=ft.border.all(1, COLORS['accent'])
-#     )
-    
-#     # Tabla del 80% de WOs más costosas - SCROLLABLE Y SELECCIONABLE CON NUEVAS COLUMNAS
-#     top_80_wo_table = ft.DataTable(
-#         ref=top_80_table,
-#         columns=[
-#             ft.DataColumn(ft.Text("Rank", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("WO Number", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Total Value", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("% Individual", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("% Acumulado", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Components", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Project", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Item Number", color=COLORS['text_primary'])),  # NUEVA COLUMNA
-#             ft.DataColumn(ft.Text("Description", color=COLORS['text_primary'])),  # NUEVA COLUMNA
-#         ],
-#         rows=[],
-#         bgcolor=COLORS['primary'],
-#         border_radius=8,
-#     )
-    
-#     # Contenedor para la tabla del 80% - SCROLLABLE MEJORADO
-#     top_80_container = ft.Container(
-#         content=ft.Column([
-#             ft.Text("🏆 Top 80% WOs Más Costosas", 
-#                    size=16, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
-#             ft.Text("WOs que concentran el mayor valor (Scrollable y Seleccionable)", 
-#                    size=12, color=COLORS['text_secondary']),
-#             ft.Container(
-#                 content=ft.Column([
-#                     top_80_wo_table
-#                 ], scroll=ft.ScrollMode.ALWAYS),  # SCROLL HABILITADO PARA VER TODAS LAS WOs
-#                 border=ft.border.all(1, COLORS['secondary']),
-#                 border_radius=8,
-#                 padding=10,
-#                 height=400,  # Altura aumentada para ver más WOs
-#                 bgcolor=COLORS['primary'],
-#             ),
-            
-#             # SECCIÓN EN BLANCO CON BÚSQUEDA DE MATERIALES
-#             ft.Container(height=20),  # Espacio en blanco
-            
-#             ft.Container(
-#                 content=ft.Column([
-#                     ft.Text("🔍 Buscar Materiales de WO", 
-#                            size=14, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
-#                     ft.Text("Consulta todos los materiales de una Work Order desde PR561", 
-#                            size=11, color=COLORS['text_secondary']),
-#                     ft.Row([
-#                         ft.TextField(
-#                             ref=wo_search_entry,
-#                             label="Número de WO",
-#                             hint_text="Ej: 12073358",
-#                             width=200,
-#                             bgcolor=COLORS['secondary'],
-#                             color=COLORS['text_primary']
-#                         ),
-#                         ft.ElevatedButton(
-#                             "🔍 Buscar Materiales",
-#                             ref=wo_search_button,
-#                             on_click=search_wo_materials,
-#                             bgcolor=COLORS['accent'],
-#                             color=COLORS['text_primary'],
-#                             icon=ft.Icons.SEARCH
-#                         )
-#                     ], spacing=10),
-#                     ft.Text("", ref=wo_search_status, size=11)
-#                 ], spacing=8),
-#                 padding=ft.padding.all(15),
-#                 bgcolor=COLORS['secondary'],
-#                 border_radius=8,
-#                 border=ft.border.all(1, COLORS['accent'])
-#             ),
-            
-#             wo_register_section  # Mantener sección de registro
-#         ], scroll=ft.ScrollMode.AUTO),
-#         padding=ft.padding.all(15),
-#         bgcolor=COLORS['primary'],
-#         border_radius=12,
-#         expand=1
-#     )
-    
-#     # Contenedor del gráfico de Pareto
-#     pareto_chart_container = ft.Container(
-#         ref=pareto_container,
-#         visible=False,
-#         content=ft.Column([
-#             ft.Text("📊 Análisis de Pareto - WO Clear por Valor", 
-#                    size=20, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
-#             ft.Text("Cargando análisis...", size=12, color=COLORS['text_secondary']),
-#             ft.Image(
-#                 ref=pareto_image,
-#                 width=800,  # Reducir ancho para dar espacio a tabla
-#                 height=400,
-#                 fit=ft.ImageFit.CONTAIN,
-#                 border_radius=8
-#             ),
-#         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-#         padding=ft.padding.all(20),
-#         bgcolor=COLORS['primary'],
-#         border_radius=12,
-#         expand=1
-#     )
-    
-#     # Row para gráfico y tabla lado a lado
-#     pareto_and_table_row = ft.Row([
-#         pareto_chart_container,
-#         top_80_container
-#     ], spacing=20)
-    
-#     # Contenedor de métricas
-#     metrics_container = ft.Column(ref=wo_clear_metrics, controls=[])
-    
-#     # Tabla de materiales de WO específica
-#     wo_materials_data_table = ft.DataTable(
-#         ref=wo_materials_table,
-#         columns=[
-#             ft.DataColumn(ft.Text("Component", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Req Date", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Qty OH", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Req Qty", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Qty Pending", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Status", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("STD Cost", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Valor Pendiente", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Valor Total", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Sort Code", color=COLORS['text_primary'])),
-#         ],
-#         rows=[],
-#         bgcolor=COLORS['primary'],
-#         border_radius=8,
-#     )
-    
-#     # NUEVA: Tabla de WOInquiry - COLUMNAS ACTUALIZADAS
-#     wo_inquiry_data_table = ft.DataTable(
-#         ref=wo_inquiry_table,
-#         columns=[
-#             ft.DataColumn(ft.Text("Entity", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Project", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("WO Number", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("SO/FCST", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Sub", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Parent WO", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Item Number", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Description", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Due Date", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("WO Type", color=COLORS['text_primary'])),
-#             ft.DataColumn(ft.Text("Status", color=COLORS['text_primary'])),
-#         ],
-#         rows=[],
-#         bgcolor=COLORS['primary'],
-#         border_radius=8,
-#     )
-    
-#     # Contenedor para tabla de materiales de WO (inicialmente oculto) - CON SCROLL
-#     wo_materials_detail_container = ft.Container(
-#         ref=wo_materials_container,
-#         visible=False,
-#         content=ft.Column([
-#             ft.Text("📋 Materiales de Work Order", 
-#                    size=18, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
-#             ft.Text("Todos los valores son seleccionables para copiar", 
-#                    size=12, color=COLORS['text_secondary']),
-#             ft.Container(
-#                 content=ft.Column([
-#                     wo_materials_data_table
-#                 ], scroll=ft.ScrollMode.ALWAYS),  # SCROLL HABILITADO
-#                 border=ft.border.all(1, COLORS['secondary']),
-#                 border_radius=8,
-#                 padding=15,
-#                 height=400,  # Altura para mejor visualización
-#                 bgcolor=COLORS['primary'],
-#             )
-#         ]),
-#         padding=ft.padding.all(20),
-#         bgcolor=COLORS['primary'],
-#         border_radius=12
-#     )
-    
-#     # NUEVO: Contenedor para tabla de WOInquiry (inicialmente oculto)
-#     wo_inquiry_detail_container = ft.Container(
-#         ref=wo_inquiry_container,
-#         visible=False,
-#         content=ft.Column([
-#             ft.Text("🔗 Work Orders Relacionadas", 
-#                    size=18, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
-#             ft.Text("", ref=wo_inquiry_status, size=12),
-#             ft.Text("WOs donde aparece como WONo o ParentWO (Seleccionable)", 
-#                    size=12, color=COLORS['text_secondary']),
-#             ft.Container(
-#                 content=ft.Column([
-#                     wo_inquiry_data_table
-#                 ], scroll=ft.ScrollMode.ALWAYS),  # SCROLL HABILITADO
-#                 border=ft.border.all(1, COLORS['secondary']),
-#                 border_radius=8,
-#                 padding=15,
-#                 height=400,  # Altura para mejor visualización
-#                 bgcolor=COLORS['primary'],
-#             )
-#         ]),
-#         padding=ft.padding.all(20),
-#         bgcolor=COLORS['primary'],
-#         border_radius=12
-#     )
-    
-#     # Layout principal de la tab
-#     return ft.Column([
-#         ft.Container(
-#             content=ft.Column([
-#                 ft.Text("🏭 Work Orders Completamente Cubiertas", 
-#                        size=24, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
-#                 ft.Text("Solo WOs donde TODOS los componentes tienen cobertura completa", 
-#                        size=12, color=COLORS['text_secondary']),
-#                 ft.Divider(color=COLORS['secondary']),
-#                 filters_row,
-#             ]),
-#             padding=ft.padding.all(20),
-#             bgcolor=COLORS['primary'],
-#             border_radius=12
-#         ),
-        
-#         # Contenedor de métricas
-#         ft.Container(
-#             content=metrics_container,
-#             padding=ft.padding.all(20),
-#             bgcolor=COLORS['primary'],
-#             border_radius=12
-#         ),
-        
-#         # Gráfico de Pareto y tabla del 80% lado a lado
-#         pareto_and_table_row,
-        
-#         # Contenedor de materiales de WO específica (SE MUESTRA SOLO AL BUSCAR)
-#         wo_materials_detail_container,
-        
-#         # NUEVO: Contenedor de WOInquiry (SE MUESTRA SOLO AL BUSCAR)
-#         wo_inquiry_detail_container,
-        
-#     ], spacing=20, scroll=ft.ScrollMode.AUTO)
-
 def create_wo_clear_tab(dashboard):
     """Crear tab para visualizar Work Orders Clear con tabla 80% y registro de WOs"""
-    
     # Estados para filtros
     selected_wo = ft.Ref[ft.Dropdown]()
     selected_project = ft.Ref[ft.Dropdown]()
@@ -1542,17 +621,22 @@ def create_wo_clear_tab(dashboard):
             return False
     
     def search_wo_inquiry_data(wo_number):
-        """Buscar WOs relacionadas en tabla WOInquiry"""
+        """Buscar WOs relacionadas en tabla WOInquiry CON OPERACIONES de Operation_WO"""
         try:
             conn = sqlite3.connect(dashboard.db_path)
             
-            # Consultar WOInquiry buscando en WONo y ParentWO - COLUMNAS CORREGIDAS
+            # Consultar WOInquiry buscando en WONo y ParentWO CON CRUCE A Operation_WO
+            # COLUMNAS EXACTAS de Operation_WO
             query = """
-            SELECT Entity, ProjectNo, WONo, SO_FCST, Sub, ParentWO, ItemNumber, Rev, 
-                   Description, AC, DueDt, CreateDt, WoType, Srt, PlanType, St
-            FROM WOInquiry 
-            WHERE WONo = ? OR ParentWO = ?
-            ORDER BY WONo, CreateDt
+            SELECT wi.Entity, wi.ProjectNo, wi.WONo, wi.SO_FCST, wi.Sub, wi.ParentWO, 
+                wi.ItemNumber, wi.Rev, wi.Description, wi.AC, wi.DueDt, wi.CreateDt, 
+                wi.WoType, wi.Srt, wi.PlanType, wi.St,
+                ow.ItemNo, ow.Description as OpDescription, ow.Seq, ow.OpID, 
+                ow.StartDate, ow.EndDate, ow.Status as OpStatus, ow.WrkCtr
+            FROM WOInquiry wi
+            LEFT JOIN Operation_WO ow ON wi.WONo = ow.WONo
+            WHERE wi.WONo = ? OR wi.ParentWO = ?
+            ORDER BY wi.WONo, wi.CreateDt, ow.Seq
             """
             
             df_wo_inquiry = pd.read_sql_query(query, conn, params=[wo_number, wo_number])
@@ -1561,11 +645,11 @@ def create_wo_clear_tab(dashboard):
             return df_wo_inquiry
             
         except Exception as e:
-            print(f"Error consultando WOInquiry: {e}")
+            print(f"Error consultando WOInquiry con Operation_WO: {e}")
             return pd.DataFrame()
     
     def update_wo_inquiry_table(df_wo_inquiry, searched_wo):
-        """Actualizar tabla de WOInquiry"""
+        """Actualizar tabla de WOInquiry CON INFORMACIÓN DE OPERACIONES"""
         wo_inquiry_table.current.rows.clear()
         
         if len(df_wo_inquiry) == 0:
@@ -1583,6 +667,15 @@ def create_wo_clear_tab(dashboard):
                 else:
                     status_color = COLORS['warning']
                 
+                # Determinar color del status de operación
+                op_status = str(row['OpStatus']) if pd.notna(row['OpStatus']) else "-"
+                if op_status.upper() in ['COMPLETED', 'CLOSED', 'FINISHED', 'C']:
+                    op_status_color = COLORS['success']
+                elif op_status.upper() in ['ACTIVE', 'OPEN', 'IN PROGRESS', 'A', 'O']:
+                    op_status_color = COLORS['accent']
+                else:
+                    op_status_color = COLORS['text_secondary']
+                
                 wo_inquiry_table.current.rows.append(
                     ft.DataRow(
                         cells=[
@@ -1597,16 +690,23 @@ def create_wo_clear_tab(dashboard):
                             ft.DataCell(ft.Text(str(row['DueDt'])[:10] if pd.notna(row['DueDt']) else "-", color=COLORS['text_primary'], selectable=True)),
                             ft.DataCell(ft.Text(str(row['WoType']) if pd.notna(row['WoType']) else "-", color=COLORS['text_secondary'], selectable=True)),
                             ft.DataCell(ft.Text(wo_status, color=status_color, selectable=True)),
+                            # COLUMNAS DE OPERACIÓN CON NOMBRES CORRECTOS
+                            ft.DataCell(ft.Text(str(row['ItemNo']) if pd.notna(row['ItemNo']) else "-", color=COLORS['warning'], selectable=True)),
+                            ft.DataCell(ft.Text(str(row['Seq']) if pd.notna(row['Seq']) else "-", color=COLORS['text_primary'], selectable=True)),
+                            ft.DataCell(ft.Text(str(row['OpID']) if pd.notna(row['OpID']) else "-", color=COLORS['text_primary'], selectable=True)),
+                            ft.DataCell(ft.Text(op_status, color=op_status_color, selectable=True)),
+                            ft.DataCell(ft.Text(str(row['WrkCtr']) if pd.notna(row['WrkCtr']) else "-", color=COLORS['text_secondary'], selectable=True)),
                         ]
                     )
                 )
             
-            # Actualizar status
-            total_wos = len(df_wo_inquiry)
-            related_wos = len(df_wo_inquiry[df_wo_inquiry['ParentWO'] == searched_wo])
-            direct_wos = len(df_wo_inquiry[df_wo_inquiry['WONo'] == searched_wo])
+            # Actualizar status con información de operaciones
+            total_wos = len(df_wo_inquiry['WONo'].unique()) if 'WONo' in df_wo_inquiry.columns else 0
+            total_operations = len(df_wo_inquiry[df_wo_inquiry['Seq'].notna()]) if 'Seq' in df_wo_inquiry.columns else 0
+            related_wos = len(df_wo_inquiry[df_wo_inquiry['ParentWO'] == searched_wo]) if 'ParentWO' in df_wo_inquiry.columns else 0
+            direct_wos = len(df_wo_inquiry[df_wo_inquiry['WONo'] == searched_wo]) if 'WONo' in df_wo_inquiry.columns else 0
             
-            wo_inquiry_status.current.value = f"✅ Encontradas {total_wos} WOs | {direct_wos} directas | {related_wos} relacionadas"
+            wo_inquiry_status.current.value = f"✅ Encontradas {total_wos} WOs únicas | {direct_wos} directas | {related_wos} relacionadas | {total_operations} operaciones"
             wo_inquiry_status.current.color = COLORS['success']
             wo_inquiry_container.current.visible = True
         
@@ -1637,11 +737,11 @@ def create_wo_clear_tab(dashboard):
             # Consultar materiales de la WO desde PR561 con costos de IN92
             query = """
             SELECT pr.Component, pr.ReqDate, 
-                   CAST(COALESCE(pr.QtyOh, 0) AS REAL) as QtyOh,
-                   CAST(COALESCE(pr.ReqQty, 0) AS REAL) as ReqQty,
-                   CAST(COALESCE(pr.QtyPending, 0) AS REAL) as QtyPending,
-                   pr.Srt, pr.Project, pr.Entity, pr.Description,
-                   CAST(COALESCE(in92.STDCost, 0) AS REAL) as STDCost
+                CAST(COALESCE(pr.QtyOh, 0) AS REAL) as QtyOh,
+                CAST(COALESCE(pr.ReqQty, 0) AS REAL) as ReqQty,
+                CAST(COALESCE(pr.QtyPending, 0) AS REAL) as QtyPending,
+                pr.Srt, pr.Project, pr.Entity, pr.Description,
+                CAST(COALESCE(in92.STDCost, 0) AS REAL) as STDCost
             FROM pr561 pr 
             LEFT JOIN in92 ON pr.Component = in92.ItemNo 
             WHERE pr.WoNo = ?
@@ -1743,7 +843,7 @@ def create_wo_clear_tab(dashboard):
             # Consultar todos los registros de WOClear_checked
             query = """
             SELECT WoNo, checked_date, user_action, notes, 
-                   datetime(checked_date, 'localtime') as fecha_registro
+                datetime(checked_date, 'localtime') as fecha_registro
             FROM WOClear_checked 
             ORDER BY checked_date DESC
             """
@@ -1905,7 +1005,7 @@ def create_wo_clear_tab(dashboard):
                 wo_clear_metrics.current.controls = [
                     ft.Container(
                         content=ft.Text("⚠️ No hay datos en tabla WOClear. Ejecuta el Dashboard Principal primero.", 
-                                       size=16, color=COLORS['warning']),
+                                    size=16, color=COLORS['warning']),
                         padding=ft.padding.all(20),
                         bgcolor=COLORS['primary'],
                         border_radius=8
@@ -2052,7 +1152,7 @@ def create_wo_clear_tab(dashboard):
                         ft.DataCell(ft.Text(f"{row['Component_Count']}", color=COLORS['text_primary'], selectable=True)),
                         ft.DataCell(ft.Text(str(row['Project']) if row['Project'] else "-", color=COLORS['text_secondary'], selectable=True)),
                         ft.DataCell(ft.Text(str(row['Description'])[:25] + "..." if len(str(row['Description'])) > 25 else str(row['Description']), 
-                                          color=COLORS['text_secondary'], selectable=True)),  # AL FINAL Y MÁS CORTA
+                                        color=COLORS['text_secondary'], selectable=True)),  # AL FINAL Y MÁS CORTA
                     ]
                 )
             )
@@ -2125,9 +1225,9 @@ def create_wo_clear_tab(dashboard):
     wo_register_section = ft.Container(
         content=ft.Column([
             ft.Text("📝 Registrar WO para Acción", 
-                   size=16, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                size=16, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
             ft.Text("Registra WOs que requieren seguimiento", 
-                   size=12, color=COLORS['text_secondary']),
+                size=12, color=COLORS['text_secondary']),
             ft.Row([
                 ft.TextField(
                     ref=wo_entry,
@@ -2197,9 +1297,9 @@ def create_wo_clear_tab(dashboard):
     top_80_container = ft.Container(
         content=ft.Column([
             ft.Text("🏆 Top 80% WOs Más Costosas", 
-                   size=16, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                size=16, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
             ft.Text("WOs que concentran el mayor valor (Scrollable y Seleccionable)", 
-                   size=12, color=COLORS['text_secondary']),
+                size=12, color=COLORS['text_secondary']),
             ft.Container(
                 content=ft.Column([
                     top_80_wo_table
@@ -2217,9 +1317,9 @@ def create_wo_clear_tab(dashboard):
             ft.Container(
                 content=ft.Column([
                     ft.Text("🔍 Buscar Materiales de WO", 
-                           size=14, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                        size=14, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
                     ft.Text("Consulta todos los materiales de una Work Order desde PR561", 
-                           size=11, color=COLORS['text_secondary']),
+                        size=11, color=COLORS['text_secondary']),
                     ft.Row([
                         ft.TextField(
                             ref=wo_search_entry,
@@ -2254,17 +1354,17 @@ def create_wo_clear_tab(dashboard):
         expand=1
     )
     
-    # Contenedor del gráfico de Pareto
+    # Contenedor del gráfico de Pareto - ANCHO COMPLETO
     pareto_chart_container = ft.Container(
         ref=pareto_container,
         visible=False,
         content=ft.Column([
             ft.Text("📊 Análisis de Pareto - WO Clear por Valor", 
-                   size=20, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                size=20, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
             ft.Text("Cargando análisis...", size=12, color=COLORS['text_secondary']),
             ft.Image(
                 ref=pareto_image,
-                width=800,  # Reducir ancho para dar espacio a tabla
+                width=1200,  # ANCHO COMPLETO para mejor visualización
                 height=400,
                 fit=ft.ImageFit.CONTAIN,
                 border_radius=8
@@ -2272,8 +1372,7 @@ def create_wo_clear_tab(dashboard):
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
         padding=ft.padding.all(20),
         bgcolor=COLORS['primary'],
-        border_radius=12,
-        expand=1
+        border_radius=12
     )
     
     # Row para gráfico y tabla lado a lado
@@ -2305,7 +1404,7 @@ def create_wo_clear_tab(dashboard):
         border_radius=8,
     )
     
-    # NUEVA: Tabla de WOInquiry - COLUMNAS ACTUALIZADAS
+    # NUEVA: Tabla de WOInquiry - CON COLUMNAS EXACTAS DE Operation_WO
     wo_inquiry_data_table = ft.DataTable(
         ref=wo_inquiry_table,
         columns=[
@@ -2319,11 +1418,17 @@ def create_wo_clear_tab(dashboard):
             ft.DataColumn(ft.Text("Description", color=COLORS['text_primary'])),
             ft.DataColumn(ft.Text("Due Date", color=COLORS['text_primary'])),
             ft.DataColumn(ft.Text("WO Type", color=COLORS['text_primary'])),
-            ft.DataColumn(ft.Text("Status", color=COLORS['text_primary'])),
+            ft.DataColumn(ft.Text("WO Status", color=COLORS['text_primary'])),
+            ft.DataColumn(ft.Text("Op Item", color=COLORS['text_primary'])),      # ItemNo
+            ft.DataColumn(ft.Text("Seq", color=COLORS['text_primary'])),          # Seq
+            ft.DataColumn(ft.Text("Op ID", color=COLORS['text_primary'])),        # OpID
+            ft.DataColumn(ft.Text("Op Status", color=COLORS['text_primary'])),    # Status
+            ft.DataColumn(ft.Text("Work Center", color=COLORS['text_primary'])),  # WrkCtr
         ],
         rows=[],
         bgcolor=COLORS['primary'],
         border_radius=8,
+        column_spacing=8,  # Espaciado entre columnas para mejor visualización
     )
     
     # Contenedor para tabla de materiales de WO (inicialmente oculto) - CON SCROLL
@@ -2332,9 +1437,9 @@ def create_wo_clear_tab(dashboard):
         visible=False,
         content=ft.Column([
             ft.Text("📋 Materiales de Work Order", 
-                   size=18, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                size=18, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
             ft.Text("Todos los valores son seleccionables para copiar", 
-                   size=12, color=COLORS['text_secondary']),
+                size=12, color=COLORS['text_secondary']),
             ft.Container(
                 content=ft.Column([
                     wo_materials_data_table
@@ -2351,16 +1456,16 @@ def create_wo_clear_tab(dashboard):
         border_radius=12
     )
     
-    # NUEVO: Contenedor para tabla de WOInquiry (inicialmente oculto)
+    # NUEVO: Contenedor para tabla de WOInquiry CON OPERACIONES (inicialmente oculto)
     wo_inquiry_detail_container = ft.Container(
         ref=wo_inquiry_container,
         visible=False,
         content=ft.Column([
-            ft.Text("🔗 Work Orders Relacionadas", 
-                   size=18, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+            ft.Text("🔗 Work Orders Relacionadas con Operaciones", 
+                size=18, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
             ft.Text("", ref=wo_inquiry_status, size=12),
-            ft.Text("WOs donde aparece como WONo o ParentWO (Seleccionable)", 
-                   size=12, color=COLORS['text_secondary']),
+            ft.Text("WOs donde aparece como WONo o ParentWO + sus operaciones de Operation_WO (Seleccionable)", 
+                size=12, color=COLORS['text_secondary']),
             ft.Container(
                 content=ft.Column([
                     wo_inquiry_data_table
@@ -2368,7 +1473,7 @@ def create_wo_clear_tab(dashboard):
                 border=ft.border.all(1, COLORS['secondary']),
                 border_radius=8,
                 padding=15,
-                height=400,  # Altura para mejor visualización
+                height=500,  # Altura aumentada para ver más información
                 bgcolor=COLORS['primary'],
             )
         ]),
@@ -2377,14 +1482,14 @@ def create_wo_clear_tab(dashboard):
         border_radius=12
     )
     
-    # Layout principal de la tab
+    # Layout principal de la tab - PARETO ARRIBA, TABLA ABAJO
     return ft.Column([
         ft.Container(
             content=ft.Column([
                 ft.Text("🏭 Work Orders Completamente Cubiertas", 
-                       size=24, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                    size=24, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
                 ft.Text("Solo WOs donde TODOS los componentes tienen cobertura completa", 
-                       size=12, color=COLORS['text_secondary']),
+                    size=12, color=COLORS['text_secondary']),
                 ft.Divider(color=COLORS['secondary']),
                 filters_row,
             ]),
@@ -2401,23 +1506,84 @@ def create_wo_clear_tab(dashboard):
             border_radius=12
         ),
         
-        # Gráfico de Pareto y tabla del 80% lado a lado
-        pareto_and_table_row,
+        # NUEVO: Solo gráfico de Pareto arriba (ancho completo)
+        pareto_chart_container,
+        
+        # NUEVO: Solo tabla del 80% abajo (ancho completo con más espacio)
+        ft.Container(
+            content=ft.Column([
+                ft.Text("🏆 Top 80% WOs Más Costosas", 
+                    size=20, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                ft.Text("WOs que concentran el mayor valor (Scrollable y Seleccionable)", 
+                    size=12, color=COLORS['text_secondary']),
+                ft.Container(
+                    content=ft.Column([
+                        top_80_wo_table
+                    ], scroll=ft.ScrollMode.ALWAYS),
+                    border=ft.border.all(1, COLORS['secondary']),
+                    border_radius=8,
+                    padding=15,
+                    height=500,  # MÁS ALTURA para ver más WOs
+                    bgcolor=COLORS['primary'],
+                ),
+                
+                # Sección de búsqueda y registro en la parte inferior
+                ft.Row([
+                    # Búsqueda de materiales
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text("🔍 Buscar Materiales de WO", 
+                                    size=14, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                            ft.Text("Consulta todos los materiales de una Work Order desde PR561", 
+                                    size=11, color=COLORS['text_secondary']),
+                            ft.Row([
+                                ft.TextField(
+                                    ref=wo_search_entry,
+                                    label="Número de WO",
+                                    hint_text="Ej: 12073358",
+                                    width=200,
+                                    bgcolor=COLORS['secondary'],
+                                    color=COLORS['text_primary']
+                                ),
+                                ft.ElevatedButton(
+                                    "🔍 Buscar Materiales",
+                                    ref=wo_search_button,
+                                    on_click=search_wo_materials,
+                                    bgcolor=COLORS['accent'],
+                                    color=COLORS['text_primary'],
+                                    icon=ft.Icons.SEARCH
+                                )
+                            ], spacing=10),
+                            ft.Text("", ref=wo_search_status, size=11)
+                        ], spacing=8),
+                        padding=ft.padding.all(15),
+                        bgcolor=COLORS['secondary'],
+                        border_radius=8,
+                        border=ft.border.all(1, COLORS['accent']),
+                        expand=1
+                    ),
+                    
+                    # Sección de registro
+                    wo_register_section
+                    
+                ], spacing=20)
+                
+            ]),
+            padding=ft.padding.all(20),
+            bgcolor=COLORS['primary'],
+            border_radius=12
+        ),
         
         # Contenedor de materiales de WO específica (SE MUESTRA SOLO AL BUSCAR)
         wo_materials_detail_container,
         
-        # NUEVO: Contenedor de WOInquiry (SE MUESTRA SOLO AL BUSCAR)
+        # Contenedor de WOInquiry (SE MUESTRA SOLO AL BUSCAR)
         wo_inquiry_detail_container,
         
     ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
-
-
-
-
 def main(page: ft.Page):
-    page.title = "Dashboard Ejecutivo - Cobertura de Inventario"
+    page.title = "Cobertura de Inventario WO Clear"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor = COLORS['surface']
     page.scroll = ft.ScrollMode.AUTO
@@ -2487,7 +1653,7 @@ def main(page: ft.Page):
                     header = ft.Container(
                         content=ft.Row([
                             ft.Column([
-                                ft.Text("📊 Dashboard Ejecutivo - Cobertura de Inventario", 
+                                ft.Text("📊 Cobertura de Inventario WO Clear", 
                                     size=32, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
                                 ft.Text(f"Análisis de {metrics['total_lines']:,} líneas PENDIENTES de surtir", 
                                     size=16, color=COLORS['text_secondary']),

@@ -672,7 +672,7 @@ TABLES_CONFIG = {
 },
 # ==================== TABLA ACTIONMESSAGES ====================
 "actionmessages": {
-    "source_file": r"J:\Departments\Material Control\Purchasing\Tools\ComprasDB\actionMessages.xlsx",
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\ActionCodes\Action_Codes.xlsx",
     "table_name": "ActionMessages",
     "file_type": "excel",
     "excel_params": {
@@ -895,31 +895,65 @@ TABLES_CONFIG = {
         "skiprows": 3
     },
     "columns_mapping": {
+        'Entity': 'Entity',
         'Project No': 'ProjectNo',
         'WO No': 'WONo',
         'SO/FCST': 'SO_FCST',
+        'Sub': 'Sub',
         'Parent WO': 'ParentWO',
         'Item-Number': 'ItemNumber',
+        'Rev': 'Rev',
+        'Description': 'Description',
+        'Misc-Code': 'MiscCode',
         'A/C': 'AC',
+        'Lead Time': 'LeadTime',
         'Due-Dt': 'DueDt',
+        'A-St-Dt': 'A_St_Dt',
+        'Comp-Dt': 'CompDt',
         'Create-Dt': 'CreateDt',
         'Wo-Type': 'WoType',
+        'Srt': 'Srt',
+        'Plnr': 'Plnr',
         'Plan Type': 'PlanType',
+        'Itm-Tp': 'ItmTp',
+        'UM': 'UM',
+        'Iss-Q': 'IssQ',
+        'Comp-Q': 'CompQ',
         'Opn-Q': 'OpnQ',
+        'St': 'St',
         'QA Aprvl': 'QAAprvl',
+        'Stk': 'Stk',
+        'Iss': 'Iss',
+        'Prt': 'Prt',
+        'User-Id': 'UserId',
+        'Std-Cost': 'StdCost',
         'Prt-No': 'PrtNo',
         'Prt-User': 'PrtUser',
-        'Prt-date': 'Prtdate'
+        'Prt-date': 'PrtDate',
+        'Opn-Hrs': 'OpnHrs',
+        'Sum-Labor-Hr': 'SumLaborHr',
+        'Static Plan No': 'StaticPlanNo',
+        'SP Rev': 'SPRev',
+        'Static Plan Desc': 'StaticPlanDesc',
+        'WO Last Notes': 'WOLastNotes'
     },
     "columns_order_original": [
-        'Entity', 'Project No', 'WO No', 'SO/FCST', 'Sub', 'Parent WO', 'Item-Number', 'Rev', 'Description',
-        'A/C', 'Due-Dt', 'Create-Dt', 'Wo-Type', 'Srt', 'Plan Type', 'Opn-Q', 'St', 'QA Aprvl', 'Prt-No',
-        'Prt-User', 'Prt-date'
+        'Entity', 'Project No', 'WO No', 'SO/FCST', 'Sub', 'Parent WO',
+        'Item-Number', 'Rev', 'Description', 'Misc-Code', 'A/C', 'Lead Time',
+        'Due-Dt', 'A-St-Dt', 'Comp-Dt', 'Create-Dt', 'Wo-Type', 'Srt', 'Plnr',
+        'Plan Type', 'Itm-Tp', 'UM', 'Iss-Q', 'Comp-Q', 'Opn-Q', 'St',
+        'QA Aprvl', 'Stk', 'Iss', 'Prt', 'User-Id', 'Std-Cost', 'Prt-No',
+        'Prt-User', 'Prt-date', 'Opn-Hrs', 'Sum-Labor-Hr', 'Static Plan No',
+        'SP Rev', 'Static Plan Desc', 'WO Last Notes'
     ],
     "columns_order_renamed": [
-        'Entity', 'ProjectNo', 'WONo', 'SO_FCST', 'Sub', 'ParentWO', 'ItemNumber', 'Rev', 'Description',
-        'AC', 'DueDt', 'CreateDt', 'WoType', 'Srt', 'PlanType', 'OpnQ', 'St', 'QAAprvl', 'PrtNo',
-        'PrtUser', 'Prtdate'
+        'Entity', 'ProjectNo', 'WONo', 'SO_FCST', 'Sub', 'ParentWO',
+        'ItemNumber', 'Rev', 'Description', 'MiscCode', 'AC', 'LeadTime',
+        'DueDt', 'A_St_Dt', 'CompDt', 'CreateDt', 'WoType', 'Srt', 'Plnr',
+        'PlanType', 'ItmTp', 'UM', 'IssQ', 'CompQ', 'OpnQ', 'St',
+        'QAAprvl', 'Stk', 'Iss', 'Prt', 'UserId', 'StdCost', 'PrtNo',
+        'PrtUser', 'PrtDate', 'OpnHrs', 'SumLaborHr', 'StaticPlanNo',
+        'SPRev', 'StaticPlanDesc', 'WOLastNotes'
     ],
     "create_table_sql": """CREATE TABLE IF NOT EXISTS WOInquiry(
         id INTEGER PRIMARY KEY,
@@ -932,18 +966,38 @@ TABLES_CONFIG = {
         ItemNumber TEXT,
         Rev TEXT,
         Description TEXT,
+        MiscCode TEXT,
         AC TEXT,
+        LeadTime TEXT,
         DueDt TEXT,
+        A_St_Dt TEXT,
+        CompDt TEXT,
         CreateDt TEXT,
         WoType TEXT,
         Srt TEXT,
+        Plnr TEXT,
         PlanType TEXT,
+        ItmTp TEXT,
+        UM TEXT,
+        IssQ TEXT,
+        CompQ TEXT,
         OpnQ TEXT,
         St TEXT,
         QAAprvl TEXT,
+        Stk TEXT,
+        Iss TEXT,
+        Prt TEXT,
+        UserId TEXT,
+        StdCost TEXT,
         PrtNo TEXT,
         PrtUser TEXT,
-        Prtdate TEXT
+        PrtDate TEXT,
+        OpnHrs TEXT,
+        SumLaborHr TEXT,
+        StaticPlanNo TEXT,
+        SPRev TEXT,
+        StaticPlanDesc TEXT,
+        WOLastNotes TEXT
     )"""
 },
 # ==================== TABLA WHERE_USE_TABLE_PLANTYPE ====================
@@ -1534,8 +1588,6 @@ TABLES_CONFIG = {
         WO TEXT
     )"""
 },
-
-
 # ==================== TABLA OPERATION WO====================
 "Operation_WO": {
     "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\PR 5 56\PR556.txt",
@@ -1598,6 +1650,31 @@ TABLES_CONFIG = {
                             Status text,
                             Prj TEXT
                         )"""
+},
+# ==================== TABLA RESPONSABLES ACTION WO====================
+"Work_order_Actions_responsibles": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\ActionCodes\Responsables_WO.xlsx",
+    "table_name": "Work_order_Actions_responsibles",
+    "file_type": "excel",
+    
+    "columns_mapping": {
+        'User': 'User',
+        'Name': 'Name',
+        'email': 'email',
+
+    },
+    "columns_order_original": [
+        'User', 'Name', 'email'
+    ],
+    "columns_order_renamed": [
+        'User', 'Name', 'email'
+    ],
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS Work_order_Actions_responsibles(
+        id INTEGER PRIMARY KEY,
+        User TEXT,
+        Name TEXT,
+        email TEXT
+    )"""
 }
 }
 
@@ -1608,7 +1685,6 @@ BASE_PATHS = {
     "source_folder": r"J:\Departments\Material Control\Purchasing\Tools\ComprasDB",
     "tracking_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\file_tracking.json"
 }
-
 def get_table_config(table_name):
     """Obtiene la configuración de una tabla específica"""
     return TABLES_CONFIG.get(table_name)
