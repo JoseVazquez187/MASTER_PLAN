@@ -563,7 +563,6 @@ def main(page: ft.Page):
 
         def buscar_wo(e=None):
             print("➡️ Entrando a buscar_wo...") 
-            # LIMPIA TODO
             result_table.rows.clear()
             expedite_table.rows.clear()
             actions_table.rows.clear()
@@ -573,7 +572,7 @@ def main(page: ft.Page):
             info_cards_row.controls.clear()
             # Si tienes mensaje de status, también límpialo:
             # status_message.value = ""
-            page.update()  # <-- MUY IMPORTANTE
+            page.update() 
 
 
             wo_number = search_wo.value.strip()
