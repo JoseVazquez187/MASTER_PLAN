@@ -22,7 +22,8 @@ COLORS = {
 
 class WOCancellationDashboard:
     def __init__(self):
-        self.db_path = r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"
+        # self.db_path = r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"
+        self.db_path = r"C:\Users\J.Vazquez\Desktop\R4Database.db"
         self.df_original = None
         self.df_enriched = None
 
@@ -429,288 +430,6 @@ def main(page: ft.Page):
         update_user_metrics()
         return user_container
 
-    # def create_analytics_tab():
-    #     analytics_container = ft.Column(spacing=20)
-
-    #     analytics_metrics_row = ft.Row([], spacing=15, wrap=True)
-    #     transition_cards_row = ft.Row([], spacing=8, alignment=ft.MainAxisAlignment.START)
-    #     info_cards_row = ft.Row([], spacing=15, wrap=True)
-
-    #     # Tabla de Partes WO
-    #     result_table = ft.DataTable(
-    #         columns=[
-    #             ft.DataColumn(ft.Text("WONo", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("SO_FCST", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("Sub", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("ItemNumber", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("Description", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("PlanType", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("OpnQ", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("ParentWO", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("CreateDt", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("Srt", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("UserId", color=COLORS['text_primary'])),
-    #         ],
-    #         rows=[],
-    #         bgcolor=COLORS['primary'],
-    #         border_radius=10,
-    #     )
-
-    #     # Tabla de Expedites
-    #     expedite_table = ft.DataTable(
-    #         columns=[
-    #             ft.DataColumn(ft.Text("id", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("AC", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("ShipDate", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("DemandSource", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("DemandType", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("Ref", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("Sub", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("EntityGroup", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("ItemNo", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("ReqQty", color=COLORS['text_primary'])),
-    #         ],
-    #         rows=[],
-    #         bgcolor=COLORS['primary'],
-    #         border_radius=10,
-    #     )
-
-    #     # Tabla de Materiales de la WO
-    #     materiales_table = ft.DataTable(
-    #         columns=[
-    #             ft.DataColumn(ft.Text("id", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("Entity", color=COLORS['text_primary'])),
-    #             # ft.DataColumn(ft.Text("Project", color=COLORS['text_primary'])),  # Removido
-    #             ft.DataColumn(ft.Text("ItemNo", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("FuseNo", color=COLORS['text_primary'])),
-    #             # ft.DataColumn(ft.Text("Description", color=COLORS['text_primary'])), # Removido
-    #             ft.DataColumn(ft.Text("PlnType", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("Srt", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("St", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("QtyOh", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("QtyIssue", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("QtyPending", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("ReqQty", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("ValQtyIss", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("ValNotIss", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("ValRequired", color=COLORS['text_primary'])),
-    #             # ft.DataColumn(ft.Text("WODescripton", color=COLORS['text_primary'])),
-    #             ft.DataColumn(ft.Text("ReqDate", color=COLORS['text_primary'])),
-    #         ],
-    #         rows=[],
-    #         bgcolor=COLORS['primary'],
-    #         border_radius=10,
-    #     )
-
-    #     tabla_container = ft.Container(
-    #         content=ft.Column([
-    #             ft.Text("📑 Detalle de Partes Asociadas a la WO", size=18, weight=ft.FontWeight.BOLD, color=COLORS['accent']),
-    #             result_table
-    #         ]),
-    #         bgcolor=COLORS['surface'],
-    #         padding=12,
-    #         border_radius=12,
-    #     )
-
-    #     expedite_container = ft.Container(
-    #         content=ft.Column([
-    #             ft.Text("🚚 Detalle de Expedites Relacionados a la WO", size=18, weight=ft.FontWeight.BOLD, color=COLORS['accent']),
-    #             expedite_table
-    #         ]),
-    #         bgcolor=COLORS['surface'],
-    #         padding=12,
-    #         border_radius=12,
-    #     )
-
-    #     materiales_container = ft.Container(
-    #         content=ft.Column([
-    #             ft.Text("📦 Materiales de la WO seleccionada", size=18, weight=ft.FontWeight.BOLD, color=COLORS['accent']),
-    #             ft.Container(
-    #                 content=materiales_table,
-    #                 height=220,
-    #                 bgcolor=COLORS['surface'],
-    #                 border_radius=12,
-    #                 padding=5,
-    #                 expand=False,
-    #             ),
-    #         ]),
-    #         bgcolor=COLORS['surface'],
-    #         padding=12,
-    #         border_radius=12,
-    #         margin=ft.margin.only(top=12)
-    #     )
-
-    #     # Campo de texto y botón
-    #     search_wo = ft.TextField(
-    #         label="Buscar WO",
-    #         hint_text="Escribe o selecciona el número de WO...",
-    #         autofocus=True,
-    #         width=320,
-    #         prefix_icon=ft.Icons.SEARCH,
-    #     )
-
-    #     def buscar_wo(e=None):
-    #         result_table.rows.clear()
-    #         expedite_table.rows.clear()
-    #         materiales_table.rows.clear()
-    #         analytics_metrics_row.controls.clear()
-    #         transition_cards_row.controls.clear()
-    #         info_cards_row.controls.clear()
-
-    #         wo_number = search_wo.value.strip()
-    #         if not wo_number:
-    #             analytics_container.controls.append(ft.Text("Escribe un WO para buscar.", color=COLORS['error']))
-    #             page.update()
-    #             return
-
-    #         # === 1. Consulta de WOInquiry ===
-    #         df_result = get_wo_inquiry_parts(wo_number, dashboard.db_path)
-    #         if len(df_result) == 0:
-    #             analytics_container.controls.append(ft.Text("No se encontraron registros para ese WO.", color=COLORS['error']))
-    #             page.update()
-    #             return
-
-    #         # --- MÉTRICAS CALCULADAS ---
-    #         total_items = len(df_result)
-    #         total_piezas = df_result['OpnQ'].astype(float).sum() if "OpnQ" in df_result.columns else 0
-
-    #         # Busca el ItemNumber de la WO buscada
-    #         item_number = df_result.iloc[0]['ItemNumber']
-    #         df_emitido = dashboard.df_original[
-    #             (dashboard.df_original['Item_Number'] == item_number)
-    #         ]
-    #         total_emitido = df_emitido['Total_ValQtyIssued'].replace('[\$,]', '', regex=True).astype(float).sum() if not df_emitido.empty else 0
-
-    #         analytics_metrics_row.controls.extend([
-    #             create_compact_metric_card("Total Partes", f"{total_items}", "Total rows", COLORS["accent"], "🧩"),
-    #             create_compact_metric_card("Piezas WO", f"{total_piezas:,.0f}", "Suma OpnQ", COLORS["success"], "🔢"),
-    #             create_compact_metric_card("Total Emitido", f"${total_emitido:,.2f}", "Material Surtido", COLORS["warning"], "💸"),
-    #         ])
-
-    #         # --- Cards adicionales ---
-    #         df_cancel = dashboard.df_original.copy()
-    #         first_item_number = df_result.iloc[0]["ItemNumber"]
-    #         cancel_row = df_cancel[(df_cancel["WO_Number"] == wo_number) & (df_cancel["Item_Number"] == first_item_number)]
-    #         if not cancel_row.empty:
-    #             row = cancel_row.iloc[0]
-    #             transition_cards_row.controls.extend([
-    #                 create_compact_metric_card("Fm_Qty", f"{int(row['Fm_Qty'])}", "Cantidad Inicial", COLORS["success"], "🏁"),
-    #                 ft.Text("➡️", size=28, color=COLORS["accent"], weight=ft.FontWeight.BOLD),
-    #                 create_compact_metric_card("To_Qty", f"{int(row['To_Qty'])}", "Cantidad Final", COLORS["warning"], "🏁"),
-    #             ])
-    #             info_cards_row.controls.extend([
-    #                 create_compact_metric_card("Días Sin Ejecutar", f"{int(row['Días_Sin_Ejecutar'])}", "", COLORS["error"], "⏰"),
-    #                 create_compact_metric_card("Responsable", f"{row['Responsible_Final']}", "", COLORS["accent"], "👤"),
-    #             ])
-    #         else:
-    #             transition_cards_row.controls.clear()
-    #             info_cards_row.controls.clear()
-
-    #         # --- 3. Llenar la tabla de partes WO (todas las celdas copiables) ---
-    #         for _, row in df_result.iterrows():
-    #             result_table.rows.append(ft.DataRow(cells=[
-    #                 ft.DataCell(ft.Text(str(row["WONo"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["SO_FCST"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["Sub"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["ItemNumber"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["Description"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["PlanType"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["OpnQ"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["ParentWO"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["CreateDt"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["Srt"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["UserId"]), selectable=True)),
-    #             ]))
-
-    #         # --- 4. Expedites: Consulta filtrada por ItemNumber (celdas copiables) ---
-    #         itemno_for_expedite = first_item_number
-    #         conn = sqlite3.connect(dashboard.db_path)
-    #         df_expedite = pd.read_sql_query("""
-    #             SELECT id, AC, ShipDate, DemandSource, DemandType, Ref, Sub, EntityGroup, ItemNo, ReqQty
-    #             FROM expedite
-    #             WHERE ItemNo = ?
-    #         """, conn, params=(itemno_for_expedite,))
-    #         # === Nuevo Card: Suma de ReqQty ===
-    #         total_req_qty = df_expedite['ReqQty'].astype(float).sum() if not df_expedite.empty else 0
-    #         analytics_metrics_row.controls.append(
-    #             create_compact_metric_card(
-    #                 "Total de Requerimiento",
-    #                 f"{total_req_qty:,.0f}",
-    #                 "Suma ReqQty (Expedite)",
-    #                 COLORS["warning"],
-    #                 "📦"
-    #             )
-    #         )
-
-    #         for _, row in df_expedite.iterrows():
-    #             expedite_table.rows.append(ft.DataRow(cells=[
-    #                 ft.DataCell(ft.Text(str(row["id"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["AC"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["ShipDate"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["DemandSource"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["DemandType"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["Ref"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["Sub"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["EntityGroup"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["ItemNo"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["ReqQty"]), selectable=True)),
-    #             ]))
-
-    #         # --- 5. Materiales de la WO seleccionada (por WONo)
-    #         df_materiales = pd.read_sql_query("""
-    #             SELECT id, Entity, ItemNo, FuseNo, PlnType, Srt, St, QtyOh, QtyIssue, QtyPending, ReqQty, ValQtyIss, ValNotIss, ValRequired, ReqDate
-    #             FROM pr561
-    #             WHERE WONo = ?
-    #         """, conn, params=(wo_number,))
-    #         conn.close()
-
-    #         for _, row in df_materiales.iterrows():
-    #             materiales_table.rows.append(ft.DataRow(cells=[
-    #                 ft.DataCell(ft.Text(str(row["id"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["Entity"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["ItemNo"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["FuseNo"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["PlnType"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["Srt"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["St"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["QtyOh"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["QtyIssue"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["QtyPending"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["ReqQty"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["ValQtyIss"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["ValNotIss"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["ValRequired"]), selectable=True)),
-    #                 ft.DataCell(ft.Text(str(row["ReqDate"]), selectable=True)),
-    #             ]))
-    #         page.update()
-
-    #     search_button = ft.ElevatedButton(
-    #         "Buscar WO",
-    #         icon=ft.Icons.SEARCH,
-    #         bgcolor=COLORS['accent'],
-    #         color=COLORS['text_primary'],
-    #         on_click=buscar_wo,
-    #     )
-
-    #     analytics_container.controls = [
-    #         ft.Container(
-    #             content=ft.Text(
-    #                 "🔬 Análisis Avanzado de WO a Cancelar",
-    #                 size=26,
-    #                 weight=ft.FontWeight.BOLD,
-    #                 color=COLORS['accent'],
-    #             ),
-    #             padding=ft.padding.only(bottom=10),
-    #         ),
-    #         ft.Row([search_wo, search_button], spacing=10),
-    #         analytics_metrics_row,
-    #         ft.Row([transition_cards_row, info_cards_row], spacing=25),
-    #         ft.Divider(),
-    #         tabla_container,
-    #         expedite_container,
-    #         materiales_container  # <-- Sección de materiales agregada al layout
-    #     ]
-    #     return analytics_container
 
     def create_analytics_tab(page, dashboard):
         analytics_container = ft.Column(spacing=20)
@@ -739,7 +458,6 @@ def main(page: ft.Page):
             bgcolor=COLORS['primary'],
             border_radius=10,
         )
-
         expedite_table = ft.DataTable(
             columns=[
                 ft.DataColumn(ft.Text("id", color=COLORS['text_primary'])),
@@ -757,7 +475,6 @@ def main(page: ft.Page):
             bgcolor=COLORS['primary'],
             border_radius=10,
         )
-
         # Tabla de acciones históricas para el recuadro rojo
         actions_table = ft.DataTable(
             columns=[
@@ -774,25 +491,18 @@ def main(page: ft.Page):
             bgcolor=COLORS['primary'],
             border_radius=10,
         )
-
         pr561_table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("id", color=COLORS['text_primary'])),
-                ft.DataColumn(ft.Text("Entity", color=COLORS['text_primary'])),
                 ft.DataColumn(ft.Text("ItemNo", color=COLORS['text_primary'])),
                 ft.DataColumn(ft.Text("FuseNo", color=COLORS['text_primary'])),
                 ft.DataColumn(ft.Text("PlnType", color=COLORS['text_primary'])),
                 ft.DataColumn(ft.Text("Srt", color=COLORS['text_primary'])),
-                ft.DataColumn(ft.Text("St", color=COLORS['text_primary'])),
                 ft.DataColumn(ft.Text("QtyOh", color=COLORS['text_primary'])),
                 ft.DataColumn(ft.Text("QtyIssue", color=COLORS['text_primary'])),
                 ft.DataColumn(ft.Text("QtyPending", color=COLORS['text_primary'])),
-                ft.DataColumn(ft.Text("ReqQty", color=COLORS['text_primary'])),
                 ft.DataColumn(ft.Text("ValQtyIss", color=COLORS['text_primary'])),
-                ft.DataColumn(ft.Text("ValNotIss", color=COLORS['text_primary'])),
-                ft.DataColumn(ft.Text("ValRequired", color=COLORS['text_primary'])),
+                ft.DataColumn(ft.Text("ReqQty", color=COLORS['text_primary'])),
                 ft.DataColumn(ft.Text("WONo", color=COLORS['text_primary'])),
-                ft.DataColumn(ft.Text("WODescripton", color=COLORS['text_primary'])),
                 ft.DataColumn(ft.Text("ReqDate", color=COLORS['text_primary'])),
             ],
             rows=[],
@@ -803,7 +513,7 @@ def main(page: ft.Page):
         # Contenedores de tablas
         tabla_container = ft.Container(
             content=ft.Column([
-                ft.Text("📑 Detalle de Partes Asociadas a la WO", size=18, weight=ft.FontWeight.BOLD, color=COLORS['accent']),
+                ft.Text("📑 WO Liberadas", size=18, weight=ft.FontWeight.BOLD, color=COLORS['accent']),
                 result_table
             ]),
             bgcolor=COLORS['surface'],
@@ -813,7 +523,7 @@ def main(page: ft.Page):
 
         expedite_container = ft.Container(
             content=ft.Column([
-                ft.Text("🚚 Detalle de Expedites Relacionados a la WO", size=18, weight=ft.FontWeight.BOLD, color=COLORS['accent']),
+                ft.Text("🚚 Expedites Relacionado con el Item", size=18, weight=ft.FontWeight.BOLD, color=COLORS['accent']),
                 expedite_table
             ]),
             bgcolor=COLORS['surface'],
@@ -823,7 +533,7 @@ def main(page: ft.Page):
 
         actions_container = ft.Container(
             content=ft.Column([
-                ft.Text("🗂 Acciones históricas de la WO", size=18, weight=ft.FontWeight.BOLD, color=COLORS['accent']),
+                ft.Text("🗂 Todas las Acciones Abiertas para el Item", size=18, weight=ft.FontWeight.BOLD, color=COLORS['accent']),
                 actions_table
             ]),
             bgcolor=COLORS['surface'],
@@ -834,8 +544,8 @@ def main(page: ft.Page):
 
         pr561_container = ft.Container(
             content=ft.Column([
-                ft.Text("📦 Materiales de la WO seleccionada", size=18, weight=ft.FontWeight.BOLD, color=COLORS['accent']),
-                ft.Container(content=pr561_table, height=200)
+                ft.Text("📦 Detalle de materiales", size=18, weight=ft.FontWeight.BOLD, color=COLORS['accent']),
+                ft.Container(content=pr561_table)
             ]),
             bgcolor=COLORS['surface'],
             padding=12,
@@ -852,7 +562,8 @@ def main(page: ft.Page):
         )
 
         def buscar_wo(e=None):
-            # Limpia tablas y métricas
+            print("➡️ Entrando a buscar_wo...") 
+            # LIMPIA TODO
             result_table.rows.clear()
             expedite_table.rows.clear()
             actions_table.rows.clear()
@@ -860,6 +571,10 @@ def main(page: ft.Page):
             analytics_metrics_row.controls.clear()
             transition_cards_row.controls.clear()
             info_cards_row.controls.clear()
+            # Si tienes mensaje de status, también límpialo:
+            # status_message.value = ""
+            page.update()  # <-- MUY IMPORTANTE
+
 
             wo_number = search_wo.value.strip()
             if not wo_number:
@@ -887,10 +602,9 @@ def main(page: ft.Page):
             total_emitido = cancel_rows['Total_ValQtyIssued'].replace(['$', ','], '', regex=True).astype(float).sum() if not cancel_rows.empty else 0
 
             analytics_metrics_row.controls.extend([
-                create_compact_metric_card("Total Partes", f"{total_items}", "Total rows", COLORS["accent"], "🧩"),
-                create_compact_metric_card("Piezas WO", f"{total_piezas:,.0f}", "Suma OpnQ", COLORS["success"], "🔢"),
-                create_compact_metric_card("Total Emitido", f"${total_emitido:,.2f}", "Material Surtido", COLORS["warning"], "💸"),
-                create_compact_metric_card("Cantidad lanzada (OpnQ)", f"{total_piezas:,.0f}", "Suma total OpnQ de todas las WO", COLORS["accent"], "📄"),
+                create_compact_metric_card("# de WO Abiertas", f"{total_items}", "Total rows", COLORS["accent"], "🧩"),
+                create_compact_metric_card("Total de Piezas", f"{total_piezas:,.0f}", "Suma OpnQ", COLORS["success"], "🔢"),
+                create_compact_metric_card("Total Surtido", f"${total_emitido:,.2f}", "Material Surtido", COLORS["warning"], "💸"),
             ])
 
             # --- 2. Cards de transición y responsable
@@ -969,34 +683,66 @@ def main(page: ft.Page):
                     ft.DataCell(ft.Text(str(row["Responsible_Final"]), selectable=True)),
                     ft.DataCell(ft.Text(str(row["Días_Sin_Ejecutar"]), selectable=True)),
                 ]))
-
             # --- 6. Materiales de la WO seleccionada (PR561) ---
-            selected_wo = df_result.iloc[0]["WONo"]
+            # selected_wo = df_result.iloc[0]["WONo"]
             conn = sqlite3.connect(dashboard.db_path)
             df_pr561 = pd.read_sql_query("""
                 SELECT id, Entity, ItemNo, FuseNo, PlnType, Srt, St, QtyOh, QtyIssue, QtyPending, ReqQty, ValQtyIss, ValNotIss, ValRequired, WONo, WODescripton, ReqDate
                 FROM pr561
                 WHERE WONo = ?
-            """, conn, params=(selected_wo,))
+            """, conn, params=(wo_number,))
             conn.close()
+            print(df_pr561)
+            print("Total rows encontrados:", len(df_pr561))
+            if df_pr561.empty:
+                pr561_warning = ft.Container(
+                    content=ft.Text(
+                        "⚠️ Validar: WO cerrada, no tiene materiales asignados.",
+                        size=18,
+                        color=COLORS['warning'],
+                        weight=ft.FontWeight.BOLD,
+                    ),
+                    padding=ft.padding.all(16),
+                    bgcolor=COLORS['surface'],
+                    border_radius=10,
+                )
+                pr561_container.content.controls.append(pr561_warning)
+            else:
+                for _, row in df_pr561.iterrows():
+                    pr561_table.rows.append(
+                        ft.DataRow(cells=[
+                            # ... tus columnas ...
+                        ])
+                    )
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
             for _, row in df_pr561.iterrows():
                 pr561_table.rows.append(ft.DataRow(cells=[
-                    ft.DataCell(ft.Text(str(row["id"]), selectable=True)),
-                    ft.DataCell(ft.Text(str(row["Entity"]), selectable=True)),
                     ft.DataCell(ft.Text(str(row["ItemNo"]), selectable=True)),
                     ft.DataCell(ft.Text(str(row["FuseNo"]), selectable=True)),
                     ft.DataCell(ft.Text(str(row["PlnType"]), selectable=True)),
                     ft.DataCell(ft.Text(str(row["Srt"]), selectable=True)),
-                    ft.DataCell(ft.Text(str(row["St"]), selectable=True)),
                     ft.DataCell(ft.Text(str(row["QtyOh"]), selectable=True)),
                     ft.DataCell(ft.Text(str(row["QtyIssue"]), selectable=True)),
                     ft.DataCell(ft.Text(str(row["QtyPending"]), selectable=True)),
-                    ft.DataCell(ft.Text(str(row["ReqQty"]), selectable=True)),
                     ft.DataCell(ft.Text(str(row["ValQtyIss"]), selectable=True)),
-                    ft.DataCell(ft.Text(str(row["ValNotIss"]), selectable=True)),
-                    ft.DataCell(ft.Text(str(row["ValRequired"]), selectable=True)),
+                    ft.DataCell(ft.Text(str(row["ReqQty"]), selectable=True)),
                     ft.DataCell(ft.Text(str(row["WONo"]), selectable=True)),
-                    ft.DataCell(ft.Text(str(row["WODescripton"]), selectable=True)),
                     ft.DataCell(ft.Text(str(row["ReqDate"]), selectable=True)),
                 ]))
             page.update()
