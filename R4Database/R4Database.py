@@ -17,7 +17,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout
                             QTabWidget)
 from PyQt5.QtCore import QTimer, QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QFont
-
+from backup_functions import create_post_update_backup, show_backup_dialog, open_backup_folder
 # Importar configuración
 try:
     from config_tables import (TABLES_CONFIG, BASE_PATHS, get_all_tables, 
@@ -174,7 +174,7 @@ class BulkUpdater(QThread):
     progress_update = pyqtSignal(str)
     table_finished = pyqtSignal(str, bool, str, dict)  # table_name, success, message, stats
     all_finished = pyqtSignal(dict)  # resumen final
-    
+    backup_finished = pyqtSignal(bool, str, str)  # success, backup_path, message
     def __init__(self, force_update=False):
         super().__init__()
         self.force_update = force_update
@@ -292,6 +292,57 @@ class BulkUpdater(QThread):
             f"✅ {updated_count} actualizadas, ℹ️ {skipped_count} sin cambios, ❌ {error_count} errores"
         )
         
+
+        """*** NUEVO: CREAR BACKUP AUTOMÁTICO ***"""
+        if updated_count > 0:  # Solo crear backup si hubo actualizaciones
+            self.progress_update.emit("💾 Creando backup automático de la base de datos...")
+            
+            try:
+                success, backup_path, backup_message = create_post_update_backup(
+                    self.db_path, 
+                    summary, 
+                    parent_widget=None
+                )
+                
+                self.backup_finished.emit(success, backup_path, backup_message)
+                
+                if success:
+                    self.progress_update.emit(f"✅ Backup creado: {os.path.basename(backup_path)}")
+                else:
+                    self.progress_update.emit(f"❌ Error en backup: {backup_message}")
+                    
+            except Exception as e:
+                self.progress_update.emit(f"❌ Error creando backup: {str(e)}")
+                self.backup_finished.emit(False, "", f"Error inesperado: {str(e)}")
+        else:
+            self.progress_update.emit("ℹ️ No se creó backup - no hubo actualizaciones")
+            self.backup_finished.emit(False, "", "No se requiere backup")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         self.all_finished.emit(summary)
     
     def update_single_table(self, table_name, config):
@@ -483,6 +534,24 @@ class R4EasyApp(QMainWindow):
         controls_layout.addWidget(self.force_update_btn)
         controls_layout.addWidget(self.refresh_btn)
         
+        
+        self.manual_backup_btn = QPushButton("💾 Backup Manual")
+        self.manual_backup_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #9b59b6;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #8e44ad; }
+        """)
+
+        controls_layout.addWidget(self.manual_backup_btn)
+        self.manual_backup_btn.clicked.connect(self.create_manual_backup)
+        controls_layout.addWidget(self.manual_backup_btn)
+
         layout.addWidget(controls_group)
         
         # Progreso individual
@@ -886,6 +955,7 @@ class R4EasyApp(QMainWindow):
             self.bulk_updater_thread.progress_update.connect(self.bulk_log_message)
             self.bulk_updater_thread.table_finished.connect(self.on_table_finished)
             self.bulk_updater_thread.all_finished.connect(self.on_bulk_finished)
+            self.bulk_updater_thread.backup_finished.connect(self.on_backup_finished)
             self.bulk_updater_thread.start()
     
     def force_bulk_update(self):
@@ -1004,6 +1074,71 @@ class R4EasyApp(QMainWindow):
         
         # Actualizar estado individual si está en la tabla actual
         self.refresh_status()
+
+    def on_backup_finished(self, success, backup_path, message):
+        """Maneja la finalización del backup automático"""
+        try:
+            if success:
+                self.bulk_log_message(f"💾 Backup completado: {os.path.basename(backup_path)}")
+                
+                backup_dialog = QMessageBox(QMessageBox.Information, "Backup Automático", "", QMessageBox.Ok, self)
+                
+                file_size = os.path.getsize(backup_path) / (1024 * 1024)
+                backup_time = datetime.now().strftime("%H:%M:%S")
+                
+                backup_dialog.setText(
+                    f"💾 ¡Backup automático creado!\n\n"
+                    f"📁 Ubicación: {backup_path}\n"
+                    f"📊 Tamaño: {file_size:.2f} MB\n"
+                    f"🕒 Hora: {backup_time}"
+                )
+                
+                open_folder_btn = backup_dialog.addButton("📁 Abrir Escritorio", QMessageBox.ActionRole)
+                backup_dialog.exec_()
+                
+                if backup_dialog.clickedButton() == open_folder_btn:
+                    open_backup_folder(backup_path)
+                    
+            else:
+                if message != "No se requiere backup":
+                    self.bulk_log_message(f"❌ Error en backup: {message}")
+                    QMessageBox.warning(self, "Error en Backup Automático", f"❌ No se pudo crear el backup automático\n\nRazón: {message}")
+                else:
+                    self.bulk_log_message("ℹ️ No se requirió backup automático")
+                    
+        except Exception as e:
+            self.bulk_log_message(f"❌ Error procesando resultado del backup: {str(e)}")
+
+    def create_manual_backup(self):
+        """Permite crear backup manual desde la interfaz"""
+        try:
+            db_path = os.path.join(BASE_PATHS["db_folder"], "R4Database.db")
+            
+            if not os.path.exists(db_path):
+                QMessageBox.warning(self, "Backup Manual", "❌ No se encontró la base de datos para hacer backup")
+                return
+            
+            reply = QMessageBox.question(
+                self, 
+                "Backup Manual", 
+                f"💾 ¿Crear backup manual de la base de datos?\n\nSe copiará al escritorio con timestamp actual.", 
+                QMessageBox.Yes | QMessageBox.No, 
+                QMessageBox.Yes
+            )
+            
+            if reply == QMessageBox.Yes:
+                from backup_functions import create_database_backup, show_backup_dialog
+                
+                success, backup_path, message = create_database_backup(db_path)
+                show_backup_dialog(self, success, backup_path, message)
+                
+                if success:
+                    self.log_message(f"💾 Backup manual creado: {os.path.basename(backup_path)}")
+                else:
+                    self.log_message(f"❌ Error en backup manual: {message}")
+                    
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error creando backup manual: {str(e)}")
 
 def main():
     """Función principal"""

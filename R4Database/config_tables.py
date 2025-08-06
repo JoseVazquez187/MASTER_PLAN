@@ -672,7 +672,7 @@ TABLES_CONFIG = {
 },
 # ==================== TABLA ACTIONMESSAGES ====================
 "actionmessages": {
-    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\ActionCodes\Action_Codes.xlsx",
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\ActionCodes\actionMessages.xlsx",
     "table_name": "ActionMessages",
     "file_type": "excel",
     "excel_params": {
@@ -1181,45 +1181,61 @@ TABLES_CONFIG = {
         }
     },
     "columns_mapping": {
+        'Entity': 'Entity',
+        'Project': 'Project',
+        'Component': 'ItemNo',
         'Fuse-No': 'FuseNo',
         'Component Description': 'Description',
-        'Qty-Oh': 'QtyOh',
-        'Qty-Issue': 'QtyIssue',
-        'Qty-no-Iss': 'QtyPending',
-        'Qty-Required': 'ReqQty',
-        'Wo-No': 'WoNo','WO-Descripton':'WODescripton','St':'St','Req-Date':'ReqDate'
+        'PlnType': 'PlnType',
+        'Srt':'Srt',
+        'St':'St','Qty-Oh':'QtyOh',
+        'Qty-Issue':'QtyIssue',
+        'Qty-no-Iss':'QtyPending',
+        'Qty-Required':'ReqQty',
+        'Val-Qty-Iss':'ValQtyIss',
+        'Val-Not-Iss':'ValNotIss',
+        'Val-Required':'ValRequired',
+        'Wo-No':'WONo',
+        'WO-Descripton':'WODescripton',
+        'St':'St',
+        'Req-Date':'ReqDate'
     },
+
     "columns_order_original": [
-        'In', 'Entity', 'Project', 'Component', 'Fuse-No', 'Component Description',
-        'PlnType', 'Srt', 'Qty-Oh', 'Qty-Issue', 'Qty-no-Iss'
-        , 'Qty-Required', 'Wo-No','WO-Descripton','St','Req-Date'
+'Entity', 'Project', 'Component', 'Fuse-No',
+        'Component Description', 'PlnType', 'Srt', 'Qty-Oh', 'Qty-Issue',
+        'Qty-no-Iss', 'Qty-Required', 'Val-Qty-Iss', 'Val-Not-Iss',
+        'Val-Required', 'Wo-No', 'WO-Descripton', 'St', 'Req-Date'
     ],
     "columns_order_renamed": [
-        'Entity', 'Project', 'Component', 'FuseNo', 'Description',
-        'PlnType', 'Srt', 'QtyOh', 'QtyIssue', 'QtyPending'
-        , 'ReqQty', 'WoNo','WODescripton','St','ReqDate'
+'Entity','Project', 'ItemNo', 'FuseNo', 'Description','PlnType', 'Srt','St', 'QtyOh'
+        ,'QtyIssue','QtyPending','ReqQty', 'ValQtyIss','ValNotIss','ValRequired','WONo'
+        , 'WODescripton', 'WoNo','WODescripton','St','ReqDate'
     ],
     "special_processing": {
         "clear_before_insert": True,
-        "custom_cleaning": True,
+        "custom_cleaning": False,
         "final_columns_only": True
     },
     "create_table_sql": """CREATE TABLE IF NOT EXISTS pr561(
         id INTEGER PRIMARY KEY,
         Entity TEXT,
         Project TEXT,
-        Component TEXT,
+        ItemNo TEXT,
         FuseNo TEXT,
         Description TEXT,
         PlnType TEXT,
         Srt TEXT,
+        St TEXT,
         QtyOh TEXT,
         QtyIssue TEXT,
         QtyPending TEXT,
         ReqQty TEXT,
-        WoNo TEXT,
+        ValQtyIss TEXT,
+        ValNotIss TEXT,
+        ValRequired TEXT,
+        WONo TEXT,
         WODescripton TEXT, 
-        St text,
         ReqDate TEXT
     )"""
 },
@@ -1651,29 +1667,62 @@ TABLES_CONFIG = {
                             Prj TEXT
                         )"""
 },
-# ==================== TABLA RESPONSABLES ACTION WO====================
-"Work_order_Actions_responsibles": {
-    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\ActionCodes\Responsables_WO.xlsx",
-    "table_name": "Work_order_Actions_responsibles",
+# ==================== TABLA RESPONSABLES ACTION WO by ENTITY====================
+"Work_order_Actions_responsibles_entity": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\ActionCodes\Responsible_by_entity.xlsx",
+    "table_name": "WO_Actions_responsibles_entity",
     "file_type": "excel",
     
     "columns_mapping": {
-        'User': 'User',
-        'Name': 'Name',
-        'email': 'email',
+        'Entity': 'Entity',
+        'Sort_entity': 'Sort_entity',
+        'Commodity': 'Commodity',
+        'Responible':'Responsible',
+        'email':'email',
+        'R4_Account':'R4_Account'
 
     },
     "columns_order_original": [
-        'User', 'Name', 'email'
+        'Entity', 'Sort_entity', 'Commodity','Responsible','email','R4_Account'
     ],
     "columns_order_renamed": [
-        'User', 'Name', 'email'
+        'Entity', 'Sort_entity', 'Commodity','Responsible','email','R4_Account'
     ],
-    "create_table_sql": """CREATE TABLE IF NOT EXISTS Work_order_Actions_responsibles(
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS WO_Actions_responsibles_entity(
         id INTEGER PRIMARY KEY,
-        User TEXT,
-        Name TEXT,
-        email TEXT
+        Entity TEXT,
+        Sort_entity TEXT,
+        Commodity TEXT,
+        Responsible TEXT,
+        email TEXT,
+        R4_Account TEXT
+    )"""
+},
+# ==================== TABLA RESPONSABLES ACTION WO by PLANTYPE====================
+"Work_order_Actions_responsibles_plantype": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\ActionCodes\Responsible_by_plantype.xlsx",
+    "table_name": "WO_Actions_responsibles_plantype",
+    "file_type": "excel",
+    
+    "columns_mapping": {
+        'Plantype': 'Plantype',
+        'Responsible': 'Responsible',
+        'email': 'email',
+        'R4_Account':'R4_Account'
+
+    },
+    "columns_order_original": [
+        'Plantype', 'Responsible', 'email','R4_Account'
+    ],
+    "columns_order_renamed": [
+        'Plantype', 'Responsible', 'email','R4_Account'
+    ],
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS WO_Actions_responsibles_plantype(
+        id INTEGER PRIMARY KEY,
+        Plantype TEXT,
+        Responsible TEXT,
+        email TEXT,
+        R4_Account TEXT
     )"""
 }
 }
