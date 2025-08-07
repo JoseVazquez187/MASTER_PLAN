@@ -8,7 +8,7 @@ TABLES_CONFIG = {
 
 # ==================== TABLA SALES_ORDER_TABLE ====================
 "sales_order_table": {
-    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\SalesOrder\sales_order.csv",
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\SalesOrder\SALESORDER.csv",
     "table_name": "sales_order_table",
     "file_type": "csv",
     "excel_params": {

@@ -8,6 +8,8 @@ import base64
 import sqlite3
 import math
 import os
+import subprocess
+import platform
 
 # === Configuración del tema gerencial dark ===
 COLORS = {
@@ -27,7 +29,7 @@ class BackScheduleAnalyzer:
         self.df = None
         self.metrics = {}
         
-    def load_data_from_db(self, db_path=r"C:\Users\J.Vazquez\Desktop\PARCHE EXPEDITE\BS_Analisis_2025_07_30.db"):
+    def load_data_from_db(self, db_path=r"C:\Users\J.Vazquez\Desktop\PARCHE EXPEDITE\BS_Analisis_2025_08_04.db"):
         """Cargar datos desde la base de datos SQLite"""
         try:
             print(f"Intentando conectar a: {db_path}")
@@ -471,6 +473,611 @@ class BackScheduleAnalyzer:
             print(f"ERROR en export: {e}")
             return {"success": False, "message": f"Error: {str(e)}"}
 
+    def load_fcst_alignment_data(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
+        """Cargar y validar alineación de FCST con WO"""
+        try:
+            print(f"Conectando a R4Database: {db_path}")
+            conn = sqlite3.connect(db_path)
+            
+            # Query para FCST con OpenQty > 0 y WO no vacío
+            fcst_query = """
+            SELECT Entity, Proj, AC, FcstNo, Description, 
+                ItemNo, ReqDate, QtyFcst, OpenQty, WO
+            FROM fcst 
+            WHERE OpenQty > 0 AND WO IS NOT NULL AND WO != ""
+            """
+            
+            # Query para WOInquiry
+            wo_query = """
+            SELECT WONo, SO_FCST, Sub, ParentWO,DueDt
+            FROM WOInquiry
+            """
+            
+            # Cargar datos
+            fcst_df = pd.read_sql_query(fcst_query, conn)
+            wo_df = pd.read_sql_query(wo_query, conn)
+            conn.close()
+            
+            print(f"✅ FCST cargado: {len(fcst_df)} registros")
+            print(f"✅ WOInquiry cargado: {len(wo_df)} registros")
+            
+            # Procesar fechas
+            fcst_df["ReqDate"] = pd.to_datetime(fcst_df["ReqDate"], errors='coerce')
+            wo_df["DueDt"] = pd.to_datetime(wo_df["DueDt"], errors='coerce')
+            
+            # Cruzar tablas: FCST.WO = WOInquiry.WONo
+            merged_df = fcst_df.merge(wo_df, left_on='WO', right_on='WONo', how='left', suffixes=('_fcst', '_wo'))
+            
+            print(f"✅ Registros cruzados: {len(merged_df)}")
+            
+            # Validar alineación: ReqDate vs DueDt
+            merged_df = merged_df.dropna(subset=['ReqDate', 'DueDt'])
+            merged_df['Date_Diff_Days'] = (merged_df['DueDt'] - merged_df['ReqDate']).dt.days
+            merged_df['Is_Aligned'] = merged_df['Date_Diff_Days'] == 0
+            
+            # Métricas de alineación
+            total_records = len(merged_df)
+            aligned_count = merged_df['Is_Aligned'].sum()
+            misaligned_count = total_records - aligned_count
+            alignment_pct = (aligned_count / total_records * 100) if total_records > 0 else 0
+            
+            # Análisis de desalineación
+            misaligned_df = merged_df[~merged_df['Is_Aligned']].copy()
+            
+            # Estadísticas de diferencias
+            mean_diff = merged_df['Date_Diff_Days'].mean()
+            std_diff = merged_df['Date_Diff_Days'].std()
+            median_diff = merged_df['Date_Diff_Days'].median()
+            
+            # Guardar resultados
+            self.fcst_data = merged_df
+            self.fcst_metrics = {
+                'total_records': total_records,
+                'aligned_count': int(aligned_count),
+                'misaligned_count': int(misaligned_count),
+                'alignment_pct': round(alignment_pct, 2),
+                'mean_diff_days': round(mean_diff, 2),
+                'std_diff_days': round(std_diff, 2),
+                'median_diff_days': round(median_diff, 2),
+                'early_wo': int((merged_df['Date_Diff_Days'] < 0).sum()),  # DueDt antes que ReqDate
+                'late_wo': int((merged_df['Date_Diff_Days'] > 0).sum()),   # DueDt después que ReqDate
+            }
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error cargando FCST: {e}")
+            # Crear datos de ejemplo para testing
+            self._create_sample_fcst_data()
+            return False
+
+    def _create_sample_fcst_data(self):
+        """Crear datos de ejemplo para FCST"""
+        np.random.seed(42)
+        n_records = 150
+        
+        # Datos simulados
+        base_date = datetime(2025, 8, 1)
+        wo_numbers = [f"WO-{1000+i:04d}" for i in range(50)]
+        
+        data = []
+        for i in range(n_records):
+            req_date = base_date + timedelta(days=i + np.random.randint(-10, 30))
+            
+            # Simular desalineación: 70% alineado, 30% desalineado
+            if np.random.random() < 0.7:
+                due_dt = req_date  # Perfectamente alineado
+            else:
+                # Desalineado con variaciones de -10 a +15 días
+                diff_days = np.random.choice([-10, -5, -3, -1, 1, 3, 5, 10, 15], 
+                                        p=[0.05, 0.10, 0.15, 0.20, 0.20, 0.15, 0.10, 0.03, 0.02])
+                due_dt = req_date + timedelta(days=diff_days)
+            
+            record = {
+                'Entity_fcst': f'Entity_{i%3}',
+                'WO': np.random.choice(wo_numbers),
+                'ItemNo': f'Item-{100+i:03d}',
+                'Description_fcst': f'FCST Item {i}',
+                'ReqDate': req_date,
+                'OpenQty': np.random.randint(1, 100),
+                'WONo': np.random.choice(wo_numbers),
+                'DueDt': due_dt,
+                'Description_wo': f'WO Item {i}',
+                'AC_wo': f'AC{i%3}',
+                'Date_Diff_Days': (due_dt - req_date).days,
+                'Is_Aligned': (due_dt - req_date).days == 0
+            }
+            data.append(record)
+        
+        self.fcst_data = pd.DataFrame(data)
+        
+        # Calcular métricas
+        total = len(self.fcst_data)
+        aligned = self.fcst_data['Is_Aligned'].sum()
+        
+        self.fcst_metrics = {
+            'total_records': total,
+            'aligned_count': int(aligned),
+            'misaligned_count': int(total - aligned),
+            'alignment_pct': round(100 * aligned / total, 2),
+            'mean_diff_days': round(self.fcst_data['Date_Diff_Days'].mean(), 2),
+            'std_diff_days': round(self.fcst_data['Date_Diff_Days'].std(), 2),
+            'median_diff_days': round(self.fcst_data['Date_Diff_Days'].median(), 2),
+            'early_wo': int((self.fcst_data['Date_Diff_Days'] < 0).sum()),
+            'late_wo': int((self.fcst_data['Date_Diff_Days'] > 0).sum()),
+        }
+
+    def create_fcst_alignment_chart(self):
+        """Crear gráfico de alineación FCST"""
+        if not hasattr(self, 'fcst_data') or self.fcst_data is None:
+            return None
+        
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            
+            plt.style.use('dark_background')
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 8))
+            fig.patch.set_facecolor(COLORS['surface'])
+            
+            # GRÁFICO 1: Histograma de diferencias
+            diff_data = self.fcst_data['Date_Diff_Days'].dropna()
+            
+            # Filtrar outliers para mejor visualización
+            q1, q3 = diff_data.quantile([0.25, 0.75])
+            iqr = q3 - q1
+            lower_bound = q1 - 2 * iqr
+            upper_bound = q3 + 2 * iqr
+            filtered_data = diff_data[(diff_data >= lower_bound) & (diff_data <= upper_bound)]
+            
+            # Histograma
+            n, bins, patches = ax1.hist(filtered_data, bins=50, alpha=0.7, 
+                                        density=True, edgecolor='white', linewidth=0.3)
+            
+            # Colorear barras: verde para alineados, rojo para desalineados
+            for i, patch in enumerate(patches):
+                if bins[i] < 0:
+                    patch.set_facecolor('#FF6B6B')  # Rojo: WO vence antes que FCST
+                elif bins[i] == 0:
+                    patch.set_facecolor('#4ECDC4')  # Verde: Perfectamente alineado
+                else:
+                    patch.set_facecolor('#45B7D1')  # Azul: WO vence después que FCST
+            
+            # Línea vertical en cero
+            ax1.axvline(x=0, color='yellow', linestyle='-', linewidth=3, alpha=0.9)
+            
+            # Estadísticas en el gráfico
+            aligned_count = self.fcst_metrics['aligned_count']
+            early_count = self.fcst_metrics['early_wo']
+            late_count = self.fcst_metrics['late_wo']
+            total_count = self.fcst_metrics['total_records']
+            
+            textstr = f'🟢 Alineados: {aligned_count:,} ({100*aligned_count/total_count:.1f}%)\n🔴 WO Temprano: {early_count:,} ({100*early_count/total_count:.1f}%)\n🔵 WO Tardío: {late_count:,} ({100*late_count/total_count:.1f}%)\nTotal: {total_count:,}'
+            props = dict(boxstyle='round', facecolor='black', alpha=0.8)
+            ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=11,
+                    verticalalignment='top', bbox=props, color='white')
+            
+            ax1.set_title('Alineación FCST vs WO: DueDt - ReqDate\n(0 = Perfecta Alineación)', 
+                        color='white', fontsize=16, fontweight='bold', pad=20)
+            ax1.set_xlabel('Diferencia (días)', color='white', fontsize=14)
+            ax1.set_ylabel('Densidad', color='white', fontsize=14)
+            ax1.grid(True, alpha=0.3, color='white')
+            ax1.set_facecolor('#2C3E50')
+            ax1.tick_params(colors='white')
+            for spine in ax1.spines.values():
+                spine.set_color('white')
+            
+            # GRÁFICO 2: Gráfico de barras por categorías
+            categories = ['WO Temprano\n(DueDt < ReqDate)', 'Alineados\n(DueDt = ReqDate)', 'WO Tardío\n(DueDt > ReqDate)']
+            values = [early_count, aligned_count, late_count]
+            colors = ['#FF6B6B', '#4ECDC4', '#45B7D1']
+            
+            bars = ax2.bar(categories, values, color=colors, alpha=0.8, edgecolor='white', linewidth=1)
+            
+            # Agregar valores en las barras
+            for bar, value in zip(bars, values):
+                height = bar.get_height()
+                ax2.text(bar.get_x() + bar.get_width()/2., height + total_count*0.01,
+                        f'{value:,}\n({100*value/total_count:.1f}%)',
+                        ha='center', va='bottom', color='white', fontsize=12, fontweight='bold')
+            
+            ax2.set_title('Distribución de Alineación FCST-WO', 
+                        color='white', fontsize=16, fontweight='bold', pad=20)
+            ax2.set_ylabel('Cantidad de Registros', color='white', fontsize=14)
+            ax2.set_facecolor('#2C3E50')
+            ax2.tick_params(colors='white')
+            ax2.grid(True, alpha=0.3, color='white', axis='y')
+            for spine in ax2.spines.values():
+                spine.set_color('white')
+            
+            plt.tight_layout()
+            
+            # Convertir a base64
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', facecolor=COLORS['surface'], 
+                    bbox_inches='tight', dpi=150)
+            buffer.seek(0)
+            chart_base64 = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            return chart_base64
+            
+        except Exception as e:
+            print(f"Error creando gráfico FCST: {e}")
+            return None
+
+    # Agrega estos métodos a la clase BackScheduleAnalyzer
+
+    def load_so_wo_alignment_data(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
+        """Cargar y validar alineación de Sales Order con WO"""
+        try:
+            print(f"Conectando a R4Database para SO-WO: {db_path}")
+            conn = sqlite3.connect(db_path)
+            
+            # Query para Sales Order - SIN FILTRAR POR WO_No, solo por Opn_Q
+            so_query = """
+            SELECT Entity, Proj, SO_No, Ln, Ord_Cd, Spr_CD, Order_Dt, Cancel_Dt, 
+                CustReqDt, Req_Dt, Pln_Ship, Prd_Dt, Inv_Dt, Recover_Dt, 
+                TimeToConfirm_hr, Std_LT, Cust, Cust_Name, Type_Code, Cust_PO, 
+                Buyer_Name, AC, Item_Number, Description, Item_Rev, UM, ML, 
+                Orig_Q, Opn_Q, OH_Netable, OH_Non_Netable, TR, Issue_Q, 
+                Plnr_Intl, Plnr_Code, PlanType, Family, Misc_Code, WO_No, 
+                WO_Due_dt, Unit_Price, OpenValue, Curr, T_Desc, So_Ln_Memo, 
+                WO_Memo, ST, AC_Priority, T_Card, Std_Cost, Cust_NCR, 
+                Reason_Cd, User_ID, Invoice_No, Shipped_Date, Ship_no, 
+                Ship_via, Tracking_No, Vendor_Code, Vendor_Name, DG, 
+                Planner_Notes, Responsibility, Last_Notes, Manuf_Charge, 
+                Memo_1, Memo_2
+            FROM sales_order_table
+            WHERE Opn_Q > 0
+            """
+            
+            # Query para WOInquiry - SOLO las que tienen SO_FCST
+            wo_query = """
+            SELECT id, Entity, ProjectNo, WONo, SO_FCST, Sub, ParentWO, 
+                ItemNumber, Rev, Description, MiscCode, AC, LeadTime, DueDt,
+                A_St_Dt, CompDt, CreateDt, WoType, Srt, Plnr, PlanType,
+                ItmTp, UM, IssQ, CompQ, OpnQ, St, QAAprvl, Stk, Iss, Prt,
+                UserId, StdCost, PrtNo, PrtUser, PrtDate, OpnHrs, SumLaborHr,
+                StaticPlanNo, SPRev, StaticPlanDesc, WOLastNotes
+            FROM WOInquiry
+            WHERE SO_FCST IS NOT NULL AND SO_FCST != "" AND Sub IS NOT NULL
+            """
+            # 2. SEGUNDO: Cargar los datos
+            so_df = pd.read_sql_query(so_query, conn)
+            wo_df = pd.read_sql_query(wo_query, conn)
+            conn.close()
+        
+            print(f"✅ Sales Order cargado: {len(so_df)} registros (con Opn_Q > 0)")
+            print(f"✅ WOInquiry cargado: {len(wo_df)} registros (con SO_FCST)")
+            
+            # 3. TERCERO: Verificar que tenemos datos
+            if len(so_df) == 0:
+                print("❌ No hay registros de Sales Order con Opn_Q > 0")
+                self._create_sample_so_wo_data()
+                return False
+                
+            if len(wo_df) == 0:
+                print("❌ No hay registros de WO con SO_FCST")
+                self._create_sample_so_wo_data()
+                return False
+            
+
+            # Crear llaves compuestas ANTES de filtrar
+            print(f"🔑 Creando llaves compuestas...")
+            so_df['SO_Key'] = so_df['SO_No'].astype(str) + '-' + so_df['Ln'].astype(str)
+            wo_df['WO_Key'] = wo_df['SO_FCST'].astype(str) + '-' + wo_df['Sub'].astype(str)
+            
+            print(f"🔑 Llaves SO creadas: {so_df['SO_Key'].nunique()} únicas de {len(so_df)} registros")
+            print(f"🔑 Llaves WO creadas: {wo_df['WO_Key'].nunique()} únicas de {len(wo_df)} registros")
+            
+            # AHORA SÍ hacer el cruce para ver coincidencias
+            print(f"🔗 Buscando coincidencias entre SO y WO...")
+            common_keys = set(so_df['SO_Key']).intersection(set(wo_df['WO_Key']))
+            print(f"🎯 Llaves que coinciden: {len(common_keys)}")
+            
+            if len(common_keys) > 0:
+                print(f"📋 Ejemplos de llaves coincidentes: {list(common_keys)[:5]}")
+            else:
+                print(f"❌ NO HAY COINCIDENCIAS - Verificando ejemplos:")
+                print(f"📋 Primeras 5 llaves SO: {so_df['SO_Key'].head().tolist()}")
+                print(f"📋 Primeras 5 llaves WO: {wo_df['WO_Key'].head().tolist()}")
+            
+            # Procesar fechas
+            so_df["Prd_Dt"] = pd.to_datetime(so_df["Prd_Dt"], errors='coerce')
+            wo_df["DueDt"] = pd.to_datetime(wo_df["DueDt"], errors='coerce')
+            
+            # Cruzar tablas: SO_Key = WO_Key (INNER JOIN para solo coincidencias)
+            merged_df = so_df.merge(wo_df, left_on='SO_Key', right_on='WO_Key', how='inner', suffixes=('_so', '_wo'))
+            
+            print(f"✅ Registros cruzados: {len(merged_df)}")
+            print(f"📊 Coincidencias encontradas: {len(merged_df)} de {len(so_df)} SO")
+            
+            # Validar alineación: Prd_Dt vs DueDt
+            merged_df = merged_df.dropna(subset=['Prd_Dt', 'DueDt'])
+            merged_df['Date_Diff_Days'] = (merged_df['DueDt'] - merged_df['Prd_Dt']).dt.days
+            merged_df['Is_Aligned'] = merged_df['Date_Diff_Days'] == 0
+            
+            # Análisis de diferencias
+            merged_df['Alignment_Status'] = merged_df.apply(lambda row: 
+                'Aligned' if row['Date_Diff_Days'] == 0 
+                else 'WO_Early' if row['Date_Diff_Days'] < 0 
+                else 'WO_Late', axis=1)
+            
+            # Métricas de alineación
+            total_records = len(merged_df)
+            aligned_count = merged_df['Is_Aligned'].sum()
+            wo_early_count = (merged_df['Date_Diff_Days'] < 0).sum()  # WO vence antes que SO
+            wo_late_count = (merged_df['Date_Diff_Days'] > 0).sum()   # WO vence después que SO
+            alignment_pct = (aligned_count / total_records * 100) if total_records > 0 else 0
+            
+            # Estadísticas de diferencias
+            mean_diff = merged_df['Date_Diff_Days'].mean()
+            std_diff = merged_df['Date_Diff_Days'].std()
+            median_diff = merged_df['Date_Diff_Days'].median()
+            
+            # Análisis por entidad y AC
+            entity_analysis = merged_df.groupby('Entity_so').agg({
+                'Is_Aligned': ['count', 'sum'],
+                'Date_Diff_Days': ['mean', 'std']
+            }).round(2)
+            
+            ac_analysis = merged_df.groupby('AC_so').agg({
+                'Is_Aligned': ['count', 'sum'], 
+                'Date_Diff_Days': ['mean', 'std']
+            }).round(2)
+            
+            # Guardar resultados
+            self.so_wo_data = merged_df
+            self.so_wo_metrics = {
+                'total_records': total_records,
+                'aligned_count': int(aligned_count),
+                'wo_early_count': int(wo_early_count),
+                'wo_late_count': int(wo_late_count),
+                'alignment_pct': round(alignment_pct, 2),
+                'mean_diff_days': round(mean_diff, 2),
+                'std_diff_days': round(std_diff, 2),
+                'median_diff_days': round(median_diff, 2),
+                'so_total': len(so_df),
+                'wo_total': len(wo_df),
+                'match_rate': round(100 * total_records / len(so_df), 2) if len(so_df) > 0 else 0  # CORREGIR DIVISIÓN POR CERO
+            }
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error cargando SO-WO: {e}")
+            # Crear datos de ejemplo para testing
+            self._create_sample_so_wo_data()
+            return False
+
+    def _create_sample_so_wo_data(self):
+        """Crear datos de ejemplo para SO-WO"""
+        np.random.seed(42)
+        n_records = 200
+        
+        # Datos simulados
+        base_date = datetime(2025, 8, 1)
+        so_numbers = [f"SO-{2000+i:04d}" for i in range(50)]
+        
+        data = []
+        for i in range(n_records):
+            so_no = np.random.choice(so_numbers)
+            ln = np.random.randint(1, 5)
+            so_key = f"{so_no}-{ln}"
+            
+            prd_dt = base_date + timedelta(days=i + np.random.randint(-5, 45))
+            
+            # Simular alineación: 60% alineado, 40% desalineado
+            if np.random.random() < 0.6:
+                due_dt = prd_dt  # Perfectamente alineado
+            else:
+                # Desalineado con variaciones más realistas para SO-WO
+                diff_days = int(np.random.choice([-15, -7, -3, -1, 1, 3, 7, 15, 21], 
+                                            p=[0.05, 0.10, 0.15, 0.20, 0.20, 0.15, 0.10, 0.04, 0.01]))  # CONVERTIR A INT
+                due_dt = prd_dt + timedelta(days=diff_days)
+            
+            record = {
+                # SO Data
+                'Entity_so': f'Entity_{i%3}',
+                'SO_No': so_no,
+                'Ln': ln,
+                'SO_Key': so_key,
+                'Item_Number': f'SO-Item-{100+i:03d}',
+                'Description_so': f'Sales Order Item {i}',
+                'Prd_Dt': prd_dt,
+                'Opn_Q': np.random.randint(1, 100),
+                'Cust_Name': f'Customer_{i%10}',
+                'AC_so': f'AC{i%4}',
+                'WO_No': f'WO-{3000+i:04d}',
+                # WO Data
+                'WONo': f'WO-{3000+i:04d}',
+                'WO_Key': so_key,
+                'SO_FCST': so_no,
+                'Sub': ln,
+                'DueDt': due_dt,
+                'Description_wo': f'WO Item {i}',
+                'WoType': np.random.choice(['Make', 'Buy', 'Transfer']),
+                'AC_wo': f'AC{i%4}',
+                'St': np.random.choice(['Open', 'Released', 'Complete']),
+                # Calculated
+                'Date_Diff_Days': (due_dt - prd_dt).days,
+                'Is_Aligned': (due_dt - prd_dt).days == 0,
+                'Alignment_Status': 'Aligned' if (due_dt - prd_dt).days == 0 
+                                else 'WO_Early' if (due_dt - prd_dt).days < 0 
+                                else 'WO_Late'
+            }
+            data.append(record)
+        
+        self.so_wo_data = pd.DataFrame(data)
+        
+        # Calcular métricas
+        total = len(self.so_wo_data)
+        aligned = self.so_wo_data['Is_Aligned'].sum()
+        wo_early = (self.so_wo_data['Date_Diff_Days'] < 0).sum()
+        wo_late = (self.so_wo_data['Date_Diff_Days'] > 0).sum()
+        
+        self.so_wo_metrics = {
+            'total_records': total,
+            'aligned_count': int(aligned),
+            'wo_early_count': int(wo_early),
+            'wo_late_count': int(wo_late), 
+            'alignment_pct': round(100 * aligned / total, 2),
+            'mean_diff_days': round(self.so_wo_data['Date_Diff_Days'].mean(), 2),
+            'std_diff_days': round(self.so_wo_data['Date_Diff_Days'].std(), 2),
+            'median_diff_days': round(self.so_wo_data['Date_Diff_Days'].median(), 2),
+            'so_total': total + 50,  # Simular que había más SO sin WO
+            'wo_total': total,
+            'match_rate': round(100 * total / (total + 50), 2)
+        }
+
+    def create_so_wo_alignment_chart(self):
+        """Crear gráfico de alineación SO-WO"""
+        if not hasattr(self, 'so_wo_data') or self.so_wo_data is None:
+            return None
+        
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            
+            plt.style.use('dark_background')
+            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20, 12))
+            fig.patch.set_facecolor(COLORS['surface'])
+            
+            # GRÁFICO 1: Histograma de diferencias
+            diff_data = self.so_wo_data['Date_Diff_Days'].dropna()
+            
+            # Filtrar outliers para mejor visualización
+            q1, q3 = diff_data.quantile([0.25, 0.75])
+            iqr = q3 - q1
+            lower_bound = q1 - 2 * iqr
+            upper_bound = q3 + 2 * iqr
+            filtered_data = diff_data[(diff_data >= lower_bound) & (diff_data <= upper_bound)]
+            
+            # Histograma
+            n, bins, patches = ax1.hist(filtered_data, bins=50, alpha=0.7, 
+                                        density=True, edgecolor='white', linewidth=0.3)
+            
+            # Colorear barras: verde para alineados, rojo/azul para desalineados
+            for i, patch in enumerate(patches):
+                if bins[i] < 0:
+                    patch.set_facecolor('#FF6B6B')  # Rojo: WO vence antes que SO
+                elif bins[i] == 0:
+                    patch.set_facecolor('#4ECDC4')  # Verde: Perfectamente alineado
+                else:
+                    patch.set_facecolor('#45B7D1')  # Azul: WO vence después que SO
+            
+            # Línea vertical en cero
+            ax1.axvline(x=0, color='yellow', linestyle='-', linewidth=3, alpha=0.9)
+            
+            # Estadísticas en el gráfico
+            metrics = self.so_wo_metrics
+            textstr = f'🟢 Alineados: {metrics["aligned_count"]:,} ({metrics["alignment_pct"]:.1f}%)\n🔴 WO Temprano: {metrics["wo_early_count"]:,}\n🔵 WO Tardío: {metrics["wo_late_count"]:,}\nTotal: {metrics["total_records"]:,}'
+            props = dict(boxstyle='round', facecolor='black', alpha=0.8)
+            ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
+                    verticalalignment='top', bbox=props, color='white')
+            
+            ax1.set_title('SO vs WO: DueDt - Prd_Dt\n(0 = Perfecta Alineación)', 
+                        color='white', fontsize=14, fontweight='bold')
+            ax1.set_xlabel('Diferencia (días)', color='white', fontsize=12)
+            ax1.set_ylabel('Densidad', color='white', fontsize=12)
+            ax1.grid(True, alpha=0.3, color='white')
+            ax1.set_facecolor('#2C3E50')
+            ax1.tick_params(colors='white')
+            for spine in ax1.spines.values():
+                spine.set_color('white')
+            
+            # GRÁFICO 2: Distribución por categorías
+            categories = ['WO Temprano\n(Antes SO)', 'Alineados\n(Exacto)', 'WO Tardío\n(Después SO)']
+            values = [metrics['wo_early_count'], metrics['aligned_count'], metrics['wo_late_count']]
+            colors = ['#FF6B6B', '#4ECDC4', '#45B7D1']
+            
+            bars = ax2.bar(categories, values, color=colors, alpha=0.8, edgecolor='white', linewidth=1)
+            
+            # Agregar valores en las barras
+            total_records = metrics['total_records']
+            for bar, value in zip(bars, values):
+                height = bar.get_height()
+                ax2.text(bar.get_x() + bar.get_width()/2., height + total_records*0.01,
+                        f'{value:,}\n({100*value/total_records:.1f}%)',
+                        ha='center', va='bottom', color='white', fontsize=11, fontweight='bold')
+            
+            ax2.set_title('Distribución SO-WO Alignment', color='white', fontsize=14, fontweight='bold')
+            ax2.set_ylabel('Cantidad', color='white', fontsize=12)
+            ax2.set_facecolor('#2C3E50')
+            ax2.tick_params(colors='white')
+            ax2.grid(True, alpha=0.3, color='white', axis='y')
+            for spine in ax2.spines.values():
+                spine.set_color('white')
+            
+            # GRÁFICO 3: Análisis por AC (si hay datos)
+            if 'AC_so' in self.so_wo_data.columns:
+                ac_stats = self.so_wo_data.groupby('AC_so')['Is_Aligned'].agg(['count', 'sum']).reset_index()
+                ac_stats['alignment_pct'] = 100 * ac_stats['sum'] / ac_stats['count']
+                
+                ax3.bar(ac_stats['AC_so'], ac_stats['alignment_pct'], 
+                    color='#45B7D1', alpha=0.8, edgecolor='white')
+                ax3.set_title('Alineación por AC', color='white', fontsize=14, fontweight='bold')
+                ax3.set_xlabel('AC', color='white')
+                ax3.set_ylabel('% Alineación', color='white')
+                ax3.set_facecolor('#2C3E50')
+                ax3.tick_params(colors='white')
+                ax3.grid(True, alpha=0.3, color='white', axis='y')
+                for spine in ax3.spines.values():
+                    spine.set_color('white')
+            else:
+                ax3.text(0.5, 0.5, 'AC Analysis\nNo disponible', transform=ax3.transAxes,
+                        ha='center', va='center', color='white', fontsize=12)
+                ax3.set_facecolor('#2C3E50')
+            
+            # GRÁFICO 4: Análisis temporal (diferencias a lo largo del tiempo)
+            if 'Prd_Dt' in self.so_wo_data.columns:
+                # Crear bins por semanas
+                self.so_wo_data['Week'] = self.so_wo_data['Prd_Dt'].dt.to_period('W')
+                weekly_stats = self.so_wo_data.groupby('Week')['Date_Diff_Days'].agg(['mean', 'count']).reset_index()
+                weekly_stats = weekly_stats[weekly_stats['count'] >= 5]  # Solo semanas con suficientes datos
+                
+                if len(weekly_stats) > 0:
+                    ax4.plot(range(len(weekly_stats)), weekly_stats['mean'], 
+                            marker='o', color='#4ECDC4', linewidth=2, markersize=6)
+                    ax4.axhline(y=0, color='yellow', linestyle='-', linewidth=2, alpha=0.7)
+                    ax4.set_title('Tendencia Temporal\n(Diferencia Promedio por Semana)', 
+                                color='white', fontsize=14, fontweight='bold')
+                    ax4.set_xlabel('Semanas', color='white')
+                    ax4.set_ylabel('Días de Diferencia', color='white')
+                    ax4.set_facecolor('#2C3E50')
+                    ax4.tick_params(colors='white')
+                    ax4.grid(True, alpha=0.3, color='white')
+                    for spine in ax4.spines.values():
+                        spine.set_color('white')
+                else:
+                    ax4.text(0.5, 0.5, 'Análisis Temporal\nDatos insuficientes', transform=ax4.transAxes,
+                            ha='center', va='center', color='white', fontsize=12)
+                    ax4.set_facecolor('#2C3E50')
+            else:
+                ax4.text(0.5, 0.5, 'Análisis Temporal\nNo disponible', transform=ax4.transAxes,
+                        ha='center', va='center', color='white', fontsize=12)
+                ax4.set_facecolor('#2C3E50')
+            
+            plt.tight_layout()
+            
+            # Convertir a base64
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', facecolor=COLORS['surface'], 
+                    bbox_inches='tight', dpi=150)
+            buffer.seek(0)
+            chart_base64 = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            return chart_base64
+            
+        except Exception as e:
+            print(f"Error creando gráfico SO-WO: {e}")
+            return None
+
+
+
+
 def create_metric_card(title, value, subtitle="", color=COLORS['accent']):
     """Crear tarjeta de métrica"""
     return ft.Card(
@@ -809,6 +1416,8 @@ def create_export_card(analyzer, export_callback):
         elevation=8
     )
 
+
+
 def main(page: ft.Page):
     page.title = "BackSchedule Analytics Dashboard - INTERPRETACIÓN FINAL"
     page.theme_mode = ft.ThemeMode.DARK
@@ -845,6 +1454,8 @@ def main(page: ft.Page):
     def load_data():
         """Cargar datos"""
         analyzer.load_data_from_db()
+        analyzer.load_fcst_alignment_data()  
+        analyzer.load_so_wo_alignment_data()  # NUEVA LÍNEA
         update_dashboard()
 
     def update_dashboard():
@@ -940,69 +1551,335 @@ def main(page: ft.Page):
                 chart_container
             ], spacing=20)
         
-        # Crear contenido de la segunda pestaña (Métricas avanzadas)
-        def create_advanced_metrics():
+
+
+        # Modifica la función create_advanced_metrics() para usar la validación FCST
+        def create_advanced_metrics(analyzer, page):
+            # Cargar datos de FCST si no están cargados
+            if not hasattr(analyzer, 'fcst_data'):
+                analyzer.load_fcst_alignment_data()
+            
+            # Métricas de FCST
+            metrics = analyzer.fcst_metrics
+            
+            # Tarjetas de métricas FCST
+            fcst_cards = ft.Row([
+                create_metric_card(
+                    "Total Registros FCST", 
+                    f"{metrics.get('total_records', 0):,}",
+                    "OpenQty > 0 con WO",
+                    COLORS['accent']
+                ),
+                create_metric_card(
+                    "Alineación Perfecta", 
+                    f"{metrics.get('alignment_pct', 0)}%",
+                    f"{metrics.get('aligned_count', 0):,} registros",
+                    COLORS['success']
+                ),
+                create_metric_card(
+                    "Desalineados", 
+                    f"{metrics.get('misaligned_count', 0):,}",
+                    f"{100-metrics.get('alignment_pct', 0):.1f}%",
+                    COLORS['error']
+                ),
+                create_metric_card(
+                    "Diferencia Promedio", 
+                    f"{metrics.get('mean_diff_days', 0)} días",
+                    f"±{metrics.get('std_diff_days', 0)} std",
+                    COLORS['warning']
+                )
+            ], wrap=True, spacing=15)
+            
+            # Gráfico de alineación
+            chart_base64 = analyzer.create_fcst_alignment_chart()
+            chart_container = ft.Container(
+                content=ft.Column([
+                    ft.Text("📊 ANÁLISIS DE ALINEACIÓN FCST vs WO", 
+                        size=20, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                    ft.Text("Comparación entre ReqDate (FCST) y DueDt (WO)", 
+                        size=12, color=COLORS['text_secondary']),
+                    ft.Image(
+                        src_base64=chart_base64,
+                        width=page.width - 80,
+                        height=500,
+                        fit=ft.ImageFit.CONTAIN
+                    ) if chart_base64 else ft.Text("Error generando gráfico", color=COLORS['error'])
+                ]),
+                padding=ft.padding.all(20),
+                bgcolor=COLORS['primary'],
+                border_radius=12
+            )
+            
+            # Botón de exportación FCST
+            def export_fcst_analysis():
+                try:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    export_path = f"FCST_Alignment_Analysis_{timestamp}.xlsx"
+                    
+                    with pd.ExcelWriter(export_path, engine='openpyxl') as writer:
+                        # Datos completos
+                        analyzer.fcst_data.to_excel(writer, sheet_name='FCST_Complete', index=False)
+                        
+                        # Solo desalineados
+                        misaligned = analyzer.fcst_data[~analyzer.fcst_data['Is_Aligned']]
+                        misaligned.to_excel(writer, sheet_name='FCST_Misaligned', index=False)
+                        
+                        # Solo alineados
+                        aligned = analyzer.fcst_data[analyzer.fcst_data['Is_Aligned']]
+                        aligned.to_excel(writer, sheet_name='FCST_Aligned', index=False)
+                    
+                    # Abrir archivo
+                    full_path = os.path.abspath(export_path)
+                    import subprocess
+                    import platform
+                    
+                    if platform.system() == 'Windows':
+                        subprocess.call(('start', full_path), shell=True)
+                    
+                    return f"✅ Exportado: {export_path}"
+                    
+                except Exception as e:
+                    return f"❌ Error: {str(e)}"
+            
+            export_fcst_card = ft.Card(
+                content=ft.Container(
+                    padding=ft.padding.all(20),
+                    bgcolor=COLORS['primary'],
+                    border_radius=12,
+                    content=ft.Column([
+                        ft.Row([
+                            ft.Text("📤 Exportar Análisis FCST", 
+                                    size=18, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD),
+                            ft.ElevatedButton(
+                                "📊 Exportar FCST",
+                                on_click=lambda _: print(export_fcst_analysis()),
+                                bgcolor=COLORS['accent'],
+                                color=COLORS['text_primary']
+                            )
+                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                        ft.Text("Se exportarán: Completos, Alineados, Desalineados", 
+                                size=12, color=COLORS['text_secondary'])
+                    ])
+                ),
+                elevation=8
+            )
+            
             return ft.Container(
                 content=ft.Column([
-                    ft.Text("📈 MÉTRICAS AVANZADAS", 
+                    ft.Text("📈 ANÁLISIS DE ALINEACIÓN FCST", 
                         size=24, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
-                    ft.Text("Análisis detallado y métricas adicionales", 
+                    ft.Text("Validación de fechas entre FCST (ReqDate) y WO (DueDt)", 
                         size=14, color=COLORS['text_secondary']),
-                    ft.Container(
-                        content=ft.Text("🚧 Contenido de métricas avanzadas en desarrollo...", 
-                                    size=16, color=COLORS['warning']),
-                        padding=ft.padding.all(40),
-                        bgcolor=COLORS['primary'],
-                        border_radius=12
-                    )
+                    fcst_cards,
+                    export_fcst_card,
+                    chart_container
                 ], spacing=20),
                 padding=ft.padding.all(20)
             )
-        
+
+
+    # Nueva función para el tercer tab
+        def create_so_wo_metrics(analyzer, page):
+                """Crear pestaña de métricas SO-WO"""
+                # Cargar datos de SO-WO si no están cargados
+                if not hasattr(analyzer, 'so_wo_data'):
+                    analyzer.load_so_wo_alignment_data()
+                
+                # Métricas de SO-WO
+                metrics = analyzer.so_wo_metrics
+                
+                # Tarjetas de métricas SO-WO
+                so_wo_cards = ft.Row([
+                    create_metric_card(
+                        "SO con WO", 
+                        f"{metrics.get('total_records', 0):,}",
+                        f"{metrics.get('match_rate', 0)}% del total SO",
+                        COLORS['accent']
+                    ),
+                    create_metric_card(
+                        "Alineación SO-WO", 
+                        f"{metrics.get('alignment_pct', 0)}%",
+                        f"{metrics.get('aligned_count', 0):,} perfectos",
+                        COLORS['success']
+                    ),
+                    create_metric_card(
+                        "WO Temprano", 
+                        f"{metrics.get('wo_early_count', 0):,}",
+                        "WO vence antes SO",
+                        COLORS['error']
+                    ),
+                    create_metric_card(
+                        "WO Tardío", 
+                        f"{metrics.get('wo_late_count', 0):,}",
+                        "WO vence después SO",
+                        COLORS['warning']
+                    )
+                ], wrap=True, spacing=15)
+                
+                # Gráfico de alineación SO-WO
+                chart_base64 = analyzer.create_so_wo_alignment_chart()
+                chart_container = ft.Container(
+                    content=ft.Column([
+                        ft.Text("📊 ANÁLISIS DE ALINEACIÓN SALES ORDER vs WORK ORDER", 
+                            size=20, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                        ft.Text("Comparación entre Prd_Dt (SO) y DueDt (WO) usando llave SO_No-Ln = SO_FCST-Sub", 
+                            size=12, color=COLORS['text_secondary']),
+                        ft.Image(
+                            src_base64=chart_base64,
+                            width=page.width - 80,
+                            height=600,
+                            fit=ft.ImageFit.CONTAIN
+                        ) if chart_base64 else ft.Text("Error generando gráfico", color=COLORS['error'])
+                    ]),
+                    padding=ft.padding.all(20),
+                    bgcolor=COLORS['primary'],
+                    border_radius=12
+                )
+                
+                # Botón de exportación SO-WO
+                def export_so_wo_analysis():
+                    try:
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        export_path = f"SO_WO_Alignment_Analysis_{timestamp}.xlsx"
+                        
+                        # Columnas seleccionadas para exportar
+                        selected_columns = [
+                            # SO Columns
+                            'Entity_so', 'SO_No', 'Ln', 'SO_Key', 'Item_Number', 
+                            'Description_so', 'Prd_Dt', 'Opn_Q', 'Cust_Name', 'AC_so', 'WO_No',
+                            # WO Columns  
+                            'WONo', 'SO_FCST', 'Sub', 'DueDt', 'Description_wo', 
+                            'WoType', 'AC_wo', 'St',
+                            # Analysis
+                            'Date_Diff_Days', 'Is_Aligned', 'Alignment_Status'
+                        ]
+                        
+                        # Filtrar solo columnas que existen
+                        available_columns = [col for col in selected_columns if col in analyzer.so_wo_data.columns]
+                        
+                        with pd.ExcelWriter(export_path, engine='openpyxl') as writer:
+                            # Datos completos
+                            analyzer.so_wo_data[available_columns].to_excel(writer, sheet_name='SO_WO_Complete', index=False)
+                            
+                            # Solo alineados
+                            aligned = analyzer.so_wo_data[analyzer.so_wo_data['Is_Aligned']]
+                            aligned[available_columns].to_excel(writer, sheet_name='SO_WO_Aligned', index=False)
+                            
+                            # Solo desalineados
+                            misaligned = analyzer.so_wo_data[~analyzer.so_wo_data['Is_Aligned']]
+                            misaligned[available_columns].to_excel(writer, sheet_name='SO_WO_Misaligned', index=False)
+                            
+                            # WO Temprano
+                            wo_early = analyzer.so_wo_data[analyzer.so_wo_data['Date_Diff_Days'] < 0]
+                            wo_early[available_columns].to_excel(writer, sheet_name='WO_Early', index=False)
+                            
+                            # WO Tardío
+                            wo_late = analyzer.so_wo_data[analyzer.so_wo_data['Date_Diff_Days'] > 0]
+                            wo_late[available_columns].to_excel(writer, sheet_name='WO_Late', index=False)
+                        
+                        # Abrir archivo
+                        full_path = os.path.abspath(export_path)
+                        import subprocess
+                        import platform
+                        
+                        if platform.system() == 'Windows':
+                            subprocess.call(('start', full_path), shell=True)
+                        
+                        return f"✅ Exportado SO-WO: {export_path}"
+                        
+                    except Exception as e:
+                        return f"❌ Error SO-WO: {str(e)}"
+                
+                export_so_wo_card = ft.Card(
+                    content=ft.Container(
+                        padding=ft.padding.all(20),
+                        bgcolor=COLORS['primary'],
+                        border_radius=12,
+                        content=ft.Column([
+                            ft.Row([
+                                ft.Text("📤 Exportar Análisis SO-WO", 
+                                        size=18, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD),
+                                ft.ElevatedButton(
+                                    "📊 Exportar SO-WO",
+                                    on_click=lambda _: print(export_so_wo_analysis()),
+                                    bgcolor=COLORS['success'],
+                                    color=COLORS['text_primary']
+                                )
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                            ft.Text("Se exportarán: Completos, Alineados, Desalineados, WO Temprano, WO Tardío", 
+                                    size=12, color=COLORS['text_secondary']),
+                            ft.Divider(color=COLORS['secondary']),
+                            ft.Row([
+                                ft.Column([
+                                    ft.Text("🟢 Alineados", size=12, color=COLORS['success']),
+                                    ft.Text(f"{metrics.get('aligned_count', 0):,}", size=16, color=COLORS['success'], weight=ft.FontWeight.BOLD)
+                                ], expand=1),
+                                ft.Column([
+                                    ft.Text("🔴 WO Temprano", size=12, color=COLORS['error']),
+                                    ft.Text(f"{metrics.get('wo_early_count', 0):,}", size=16, color=COLORS['error'], weight=ft.FontWeight.BOLD)
+                                ], expand=1),
+                                ft.Column([
+                                    ft.Text("🔵 WO Tardío", size=12, color=COLORS['warning']),
+                                    ft.Text(f"{metrics.get('wo_late_count', 0):,}", size=16, color=COLORS['warning'], weight=ft.FontWeight.BOLD)
+                                ], expand=1)
+                            ])
+                        ])
+                    ),
+                    elevation=8
+                )
+                
+                return ft.Container(
+                    content=ft.Column([
+                        ft.Text("📈 ANÁLISIS DE ALINEACIÓN SALES ORDER vs WORK ORDER", 
+                            size=24, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                        ft.Text("Validación de fechas SO (Prd_Dt) vs WO (DueDt) con llave compuesta", 
+                            size=14, color=COLORS['text_secondary']),
+                        so_wo_cards,
+                        export_so_wo_card,
+                        chart_container
+                    ], spacing=20),
+                    padding=ft.padding.all(20)
+                )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         # Crear pestañas
         tabs = ft.Tabs(
-            selected_index=0,
-            animation_duration=300,
-            tabs=[
-                ft.Tab(
-                    text="📊 Dashboard Principal",
-                    content=create_main_dashboard()
-                ),
-                ft.Tab(
-                    text="📈 Métricas Avanzadas", 
-                    content=create_advanced_metrics()
-                )
-            ],
-            expand=1
-        )
-        
-        # Agregar componentes
-        main_container.controls.extend([
-            header,
-            tabs
-        ])
+        selected_index=0,
+        animation_duration=300,
+        tabs=[
+            ft.Tab(
+                text="📊 Dashboard Principal",
+                content=create_main_dashboard()
+            ),
+            ft.Tab(
+                text="📈 Métricas FCST", 
+                content=create_advanced_metrics(analyzer, page)  # PASAR PARÁMETROS
+            ),
+            ft.Tab(
+                text="🛒 Análisis SO-WO",
+                content=create_so_wo_metrics(analyzer, page)  # PASAR PARÁMETROS
+            )
+        ],
+        expand=1
+    )
         
         page.update()
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     
     # Cargar datos iniciales
     load_data()
