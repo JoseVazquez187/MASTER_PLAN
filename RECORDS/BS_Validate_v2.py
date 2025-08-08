@@ -18,6 +18,7 @@ import math
 import tempfile
 import webbrowser
 
+
 # === Configuración del tema gerencial dark ===
 COLORS = {
     'primary': '#1e293b',      # Slate 800
@@ -480,7 +481,7 @@ class BackScheduleAnalyzer:
             print(f"ERROR en export: {e}")
             return {"success": False, "message": f"Error: {str(e)}"}
 
-    def load_fcst_alignment_data(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
+    def load_fcst_alignment_data(self, db_path=r"C:\Users\J.Vazquez\Desktop\R4Database.db"):
         """Cargar y validar alineación de FCST con WO"""
         try:
             print(f"Conectando a R4Database: {db_path}")
@@ -558,7 +559,7 @@ class BackScheduleAnalyzer:
             self._create_sample_fcst_data()
             return False
 
-    def load_sales_order_alignment_data(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
+    def load_sales_order_alignment_data(self, db_path=r"C:\Users\J.Vazquez\Desktop\R4Database.db"):
         """Cargar y validar alineación de Sales Orders con Work Orders"""
         try:
             print(f"Conectando a R4Database para SO-WO: {db_path}")
@@ -669,7 +670,7 @@ class BackScheduleAnalyzer:
             self._create_sample_so_data()
             return False
 
-    def load_wo_materials_analysis(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
+    def load_wo_materials_analysis(self, db_path=r"C:\Users\J.Vazquez\Desktop\R4Database.db"):
         """Cargar y analizar WO con/sin materiales (pr561)"""
         try:
             print(f"Conectando a R4Database para WO-Materials: {db_path}")
@@ -1698,6 +1699,25 @@ class BackScheduleAnalyzer:
             print("❌ Traceback completo:")
             traceback.print_exc()
             return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def create_metric_card(title, value, subtitle="", color=COLORS['accent']):

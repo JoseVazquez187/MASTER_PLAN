@@ -334,6 +334,55 @@ TABLES_CONFIG = {
         Shelf_Life TEXT
     )"""
 },
+
+#==================== TABLA locations WHS whs_location_in36851====================
+"whs_location_in36851": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\WHS_Locations\whs_location_in36851.txt",
+    "table_name": "whs_location_in36851",
+    "file_type": "fixed_width",
+    "fixed_width_params": {
+        "widths": [3,10,9,31,12,9,10,29,9,9],
+        "header": 3,
+        "skip_rows": [0]
+    },
+    "special_processing": {
+        "custom_cleaning": True,
+        "use_exact_logic": True
+    },
+    "columns_mapping": {
+        'Whs': 'Whs',
+        'Bin ID': 'BinID',
+        'Loc-ID': 'LocID',
+        'Description': 'Description',
+        'Excl-Bin': 'ExclBin',
+        'Zone': 'Zone',
+        'Container': 'Container',
+        'Tag                  Netable': 'TagNetable',
+        'Section': 'Section',
+        'Type': 'Type'
+    },
+    "columns_order_original": [
+        'Whs', 'Bin ID', 'Loc-ID', 'Description', 'Excl-Bin', 'Zone',
+        'Container', 'Tag                  Netable', 'Section', 'Type'
+    ],
+    "columns_order_renamed": [
+        'Whs', 'BinID', 'LocID', 'Description', 'ExclBin', 'Zone',
+        'Container', 'TagNetable', 'Section', 'Type'
+    ],
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS whs_location_in36851(
+        id INTEGER PRIMARY KEY,
+        Whs TEXT,
+        BinID TEXT,
+        LocID TEXT,
+        Description TEXT,
+        ExclBin TEXT,
+        Zone TEXT,
+        Container TEXT,
+        TagNetable TEXT,
+        Section TEXT,
+        Type TEXT
+    )"""
+},
 # ==================== TABLA SUPERBOM ====================
 "bom": {
     "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\SUPERBOM\SUPERBOM.txt",
@@ -1727,6 +1776,12 @@ TABLES_CONFIG = {
 }
 }
 
+
+
+
+
+
+
 # Rutas globales usando raw strings para evitar problemas con backslashes
 BASE_PATHS = {
     "db_folder": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database",
@@ -2459,6 +2514,164 @@ def verify_paths():
             print(f"⚙️ {table_name}: Archivo de selección dinámica")
         else:
             print(f"❌ {table_name}: {os.path.basename(source_file)} - NO EXISTE")
+
+def process_whs_location_exact(df, table_config):
+    """
+    Procesamiento EXACTO como tu código funcional para whs_location_in36851
+    """
+    import pandas as pd
+    
+    print(f"🏭 Procesando WHS Location con tu lógica exacta...")
+    initial_count = len(df)
+    print(f"   📊 Filas iniciales: {initial_count}")
+    
+    try:
+        # PASO 1: df = df.drop(0) - Eliminar fila índice 0
+        if len(df) > 0 and 0 in df.index:
+            df = df.drop(0)
+            print(f"   🗑️ Eliminada fila índice 0")
+        
+        # PASO 2: df = df.drop(1) - Eliminar fila índice 1  
+        if len(df) > 0 and 1 in df.index:
+            df = df.drop(1)
+            print(f"   🗑️ Eliminada fila índice 1")
+        
+        # PASO 3: df = df.loc[df['Whs']=='CH'] - MANTENER solo CH
+        if 'Whs' in df.columns:
+            before_filter = len(df)
+            df = df.loc[df['Whs'] == 'CH']  # ✅ Tu lógica exacta
+            after_filter = len(df)
+            filtered = before_filter - after_filter
+            print(f"   ✅ Filtro Whs='CH': Mantenidas {after_filter} filas, eliminadas {filtered}")
+        else:
+            print(f"   ❌ ERROR: Columna 'Whs' no encontrada. Columnas disponibles: {list(df.columns)}")
+        
+        # PASO 4: df = df.fillna('') - Rellenar NaN
+        df = df.fillna('')
+        print(f"   🔧 Valores NaN rellenados con cadenas vacías")
+        
+        # PASO 5: Reset index para evitar problemas
+        df.reset_index(drop=True, inplace=True)
+        print(f"   🔄 Index reseteado")
+        
+    except Exception as e:
+        print(f"   ❌ ERROR en procesamiento WHS: {e}")
+        import traceback
+        traceback.print_exc()
+        return df
+    
+    final_count = len(df)
+    total_filtered = initial_count - final_count
+    
+    print(f"   ✅ Procesamiento WHS completado:")
+    print(f"     - Filas iniciales: {initial_count}")
+    print(f"     - Filas finales: {final_count}")
+    print(f"     - Total filtradas: {total_filtered}")
+    print(f"     - Porcentaje mantenido: {(final_count/initial_count)*100:.1f}%")
+    
+    # Verificación de datos
+    if not df.empty:
+        print("   📄 Verificación de datos finales:")
+        sample = df.head(3)
+        for idx, row in sample.iterrows():
+            whs = row.get('Whs', 'N/A')
+            binid = row.get('Bin ID', 'N/A') 
+            locid = row.get('Loc-ID', 'N/A')
+            zone = row.get('Zone', 'N/A')
+            print(f"     Fila {idx}: Whs='{whs}', BinID='{binid}', LocID='{locid}', Zone='{zone}'")
+        
+        # Verificar que NO hay datos basura
+        unique_whs = df['Whs'].unique() if 'Whs' in df.columns else ['N/A']
+        print(f"   📊 Valores únicos en Whs: {unique_whs}")
+        
+        # Contar filas con nan.0 o similares (no debería haber ninguna)
+        if 'Whs' in df.columns:
+            bad_whs = df[df['Whs'].isin(['nan.0', 'nan', '0', ''])].shape[0]
+            print(f"   🔍 Filas con Whs inválido: {bad_whs} (debería ser 0)")
+    
+    return df
+
+def apply_special_processing(df, table_config):
+    """Aplica procesamiento especial - VERSIÓN CORREGIDA SIN ERRORES"""
+    special_processing = table_config.get("special_processing", {})
+    table_name = table_config.get("table_name", "")
+    
+    # ========== TU LÓGICA EXACTA PARA WHS LOCATION ==========
+    if table_name == "whs_location_in36851":
+        print(f"🎯 Detectada whs_location_in36851 - usando tu código exacto...")
+        df = process_whs_location_exact(df, table_config)
+        return df  # ✅ Retornar inmediatamente después del procesamiento
+    
+    # ========== PROCESAMIENTO ESPECIAL PARA SUPERBOM ==========
+    if (table_name == "bom" and 
+        special_processing.get("generate_key_by_level", False) and
+        special_processing.get("custom_cleaning", False)):
+        
+        print(f"🎯 Aplicando procesamiento especial para SUPERBOM...")
+        df = process_superbom_complete(df, table_config)
+        return df
+    
+    # ========== PROCESAMIENTO ESPECIAL PARA KITING GROUPS ==========
+    if (table_name == "kiting_groups" and 
+        special_processing.get("custom_cleaning", False)):
+        
+        print(f"🎯 Aplicando procesamiento especial para KITING GROUPS...")
+        # ✅ CORREGIDO: Usar la función correcta que ya existe en tu código
+        df = apply_data_filters(df, table_config)
+        return df
+    
+    # ========== RESTO DEL PROCESAMIENTO ORIGINAL ==========
+    
+    # Procesamiento de fechas de expiración para reworkloc_all
+    if special_processing.get("fill_expire_date", False):
+        expire_col = None
+        for col in df.columns:
+            if 'expire' in col.lower() or 'expir' in col.lower():
+                expire_col = col
+                break
+        
+        if expire_col:
+            print(f"   📅 Procesando fechas de expiración en columna: {expire_col}")
+            import pandas as pd
+            from datetime import datetime
+            
+            current_date = datetime.today().date()
+            years_to_add = special_processing.get("expire_years", 2)
+            future_date = pd.Timestamp(current_date) + pd.DateOffset(years=years_to_add)
+            
+            df[expire_col].fillna(future_date.normalize(), inplace=True)
+            print(f"   ✅ Fechas nulas rellenadas con: {future_date.date()}")
+    
+    # Procesamiento para arreglar años de fecha de expiración
+    if special_processing.get("fix_expire_date_year", False):
+        import pandas as pd
+        
+        year_threshold = special_processing.get("year_threshold", 1950)
+        year_adjustment = special_processing.get("year_adjustment", 100)
+        
+        for col in df.columns:
+            if 'expire' in col.lower() or 'expir' in col.lower():
+                print(f"   📅 Corrigiendo años en columna: {col}")
+                break
+    
+    return df
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 if __name__ == "__main__":
     print("=== Verificación de Configuración Multi-Tabla ===")

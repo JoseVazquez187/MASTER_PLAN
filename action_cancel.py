@@ -685,18 +685,14 @@ def main(page: ft.Page):
             # --- 6. Materiales de la WO seleccionada (PR561) ---
             # selected_wo = df_result.iloc[0]["WONo"]
             conn = sqlite3.connect(dashboard.db_path)
-            # --- 6. Materiales de la WO seleccionada (PR561) ---
-            conn = sqlite3.connect(dashboard.db_path)
             df_pr561 = pd.read_sql_query("""
                 SELECT id, Entity, ItemNo, FuseNo, PlnType, Srt, St, QtyOh, QtyIssue, QtyPending, ReqQty, ValQtyIss, ValNotIss, ValRequired, WONo, WODescripton, ReqDate
                 FROM pr561
                 WHERE WONo = ?
             """, conn, params=(wo_number,))
             conn.close()
-
             print(df_pr561)
             print("Total rows encontrados:", len(df_pr561))
-
             if df_pr561.empty:
                 pr561_warning = ft.Container(
                     content=ft.Text(
@@ -711,23 +707,44 @@ def main(page: ft.Page):
                 )
                 pr561_container.content.controls.append(pr561_warning)
             else:
-                # SOLO UN BUCLE - Elimina los otros dos bucles duplicados
                 for _, row in df_pr561.iterrows():
-                    pr561_table.rows.append(ft.DataRow(cells=[
-                        ft.DataCell(ft.Text(str(row["ItemNo"]), selectable=True)),
-                        ft.DataCell(ft.Text(str(row["FuseNo"]), selectable=True)),
-                        ft.DataCell(ft.Text(str(row["PlnType"]), selectable=True)),
-                        ft.DataCell(ft.Text(str(row["Srt"]), selectable=True)),
-                        ft.DataCell(ft.Text(str(row["QtyOh"]), selectable=True)),
-                        ft.DataCell(ft.Text(str(row["QtyIssue"]), selectable=True)),
-                        ft.DataCell(ft.Text(str(row["QtyPending"]), selectable=True)),
-                        ft.DataCell(ft.Text(str(row["ValQtyIss"]), selectable=True)),
-                        ft.DataCell(ft.Text(str(row["ReqQty"]), selectable=True)),
-                        ft.DataCell(ft.Text(str(row["WONo"]), selectable=True)),
-                        ft.DataCell(ft.Text(str(row["ReqDate"]), selectable=True)),
-                    ]))
+                    pr561_table.rows.append(
+                        ft.DataRow(cells=[
+                            # ... tus columnas ...
+                        ])
+                    )
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            for _, row in df_pr561.iterrows():
+                pr561_table.rows.append(ft.DataRow(cells=[
+                    ft.DataCell(ft.Text(str(row["ItemNo"]), selectable=True)),
+                    ft.DataCell(ft.Text(str(row["FuseNo"]), selectable=True)),
+                    ft.DataCell(ft.Text(str(row["PlnType"]), selectable=True)),
+                    ft.DataCell(ft.Text(str(row["Srt"]), selectable=True)),
+                    ft.DataCell(ft.Text(str(row["QtyOh"]), selectable=True)),
+                    ft.DataCell(ft.Text(str(row["QtyIssue"]), selectable=True)),
+                    ft.DataCell(ft.Text(str(row["QtyPending"]), selectable=True)),
+                    ft.DataCell(ft.Text(str(row["ValQtyIss"]), selectable=True)),
+                    ft.DataCell(ft.Text(str(row["ReqQty"]), selectable=True)),
+                    ft.DataCell(ft.Text(str(row["WONo"]), selectable=True)),
+                    ft.DataCell(ft.Text(str(row["ReqDate"]), selectable=True)),
+                ]))
             page.update()
-
 
         search_button = ft.ElevatedButton(
             "Buscar WO",
@@ -794,7 +811,6 @@ def main(page: ft.Page):
     page.add(tabs)
 
 def get_wo_inquiry_parts(wo_number, db_path):
-    print('aqui get_wo_inquiry_parts')
     conn = sqlite3.connect(db_path)
     # 1. Buscar el ItemNumber de la WO consultada
     df_wo = pd.read_sql_query("""
@@ -813,7 +829,6 @@ def get_wo_inquiry_parts(wo_number, db_path):
     return df
 
 def get_expedite_parts(item_numbers, db_path):
-    print('aqui get_expedite_parts')
     conn = sqlite3.connect(db_path)
     # Asegúrate que item_numbers es una lista/serie de strings
     placeholders = ','.join(['?'] * len(item_numbers))
