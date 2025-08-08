@@ -22,8 +22,8 @@ COLORS = {
 
 class WOCancellationDashboard:
     def __init__(self):
-        # self.db_path = r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"
-        self.db_path = r"C:\Users\J.Vazquez\Desktop\R4Database.db"
+        self.db_path = r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"
+        # self.db_path = r"C:\Users\J.Vazquez\Desktop\R4Database.db"
         self.df_original = None
         self.df_enriched = None
 
