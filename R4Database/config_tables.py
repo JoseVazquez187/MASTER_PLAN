@@ -334,7 +334,6 @@ TABLES_CONFIG = {
         Shelf_Life TEXT
     )"""
 },
-
 #==================== TABLA locations WHS whs_location_in36851====================
 "whs_location_in36851": {
     "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\WHS_Locations\whs_location_in36851.txt",
