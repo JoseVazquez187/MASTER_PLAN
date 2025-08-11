@@ -21,7 +21,7 @@ base_username = os.getlogin()
 #     username = username_with_one
 # else:
 #     username = base_username
-
+print(base_username)
 path_base = f'C:\\Users\\{base_username}\\Desktop\\PARCHE EXPEDITE'
 file_fcst_excel = 'FCST.xlsx'
 file_bom = 'SUPERBOM.txt'
