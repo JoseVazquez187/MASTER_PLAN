@@ -319,30 +319,6 @@ class BulkUpdater(QThread):
             self.backup_finished.emit(False, "", "No se requiere backup")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         self.all_finished.emit(summary)
     
     def update_single_table(self, table_name, config):

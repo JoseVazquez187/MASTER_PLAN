@@ -92,6 +92,7 @@ df_merged.loc[
 ] = 2
 
 # === Guardar Expedite_final.db ===
+# === Guardar Expedite_final.db ===
 output_path = os.path.join(os.path.dirname(db_path), "Expedite_final.db")
 conn_out = sqlite3.connect(output_path)
 df_merged.to_sql("expedite", conn_out, if_exists="replace", index=False)
@@ -104,33 +105,6 @@ bs_analisis_path = os.path.join(os.path.dirname(db_path), f"BS_Analisis_{today_s
 conn_bs = sqlite3.connect(bs_analisis_path)
 df_merged.to_sql("expedite", conn_bs, if_exists="replace", index=False)
 conn_bs.close()
-
-# === NUEVA FUNCIONALIDAD: Crear tabla expedite_fill_doc en R4Database.db ===
-r4_database_path = r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"
-
-try:
-    # Verificar si existe la base de datos R4Database.db
-    if os.path.exists(r4_database_path):
-        conn_r4 = sqlite3.connect(r4_database_path)
-        df_merged.to_sql("expedite_fill_doc", conn_r4, if_exists="replace", index=False)
-        conn_r4.close()
-        
-        # Validación de integridad para R4Database.db
-        conn_check_r4 = sqlite3.connect(r4_database_path)
-        total_en_sql_r4 = pd.read_sql_query("SELECT COUNT(*) as total FROM expedite_fill_doc", conn_check_r4).iloc[0]['total']
-        conn_check_r4.close()
-        
-        if len(df_merged) == total_en_sql_r4:
-            print(f"✅ Tabla 'expedite_fill_doc' creada correctamente en R4Database.db con {total_en_sql_r4} registros.")
-        else:
-            print(f"❌ Advertencia: Tabla 'expedite_fill_doc' en R4Database.db no coincide.")
-            print(f"   - Registros esperados: {len(df_merged)}")
-            print(f"   - Registros reales: {total_en_sql_r4}")
-    else:
-        print(f"❌ No se encontró la base de datos R4Database.db en: {r4_database_path}")
-        
-except Exception as e:
-    print(f"❌ Error al crear tabla en R4Database.db: {str(e)}")
 
 # === Validación de integridad: Expedite_final.db ===
 conn_check = sqlite3.connect(output_path)

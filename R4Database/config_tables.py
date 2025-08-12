@@ -1715,6 +1715,80 @@ TABLES_CONFIG = {
                             Prj TEXT
                         )"""
 },
+# ==================== TABLA slowmotion====================
+"slowmotion": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\SlowMotion_in524\in524.txt",
+    "table_name": "slowmotion",
+    "file_type": "fixed_width",
+    "fixed_width_params": {
+        "widths": [31, 22, 3, 1, 3, 11, 10, 15, 4, 9, 9, 5, 8, 3, 4, 8, 7, 4, 9, 12, 50],
+        "header": 3,
+        "skip_rows": [0]
+    },
+    "columns_mapping": {
+        'Item-Number': 'ItemNo',
+        'Description':'Description',
+        'UM':'UM',
+        'S':'S',
+        'WH':'WH',
+        'Last-Date':'LastDate',
+        'Bin':'Bin',
+        'Lot':'Lot',
+        'Rev':'Rev',
+        'Entity':'Entity',
+        'PlanType':'PlanType',
+        'Prj':'Prj',
+        'Prd-Grp':'PrdGrp',
+        'MLI':'MLI',
+        'LT':'LT',
+        'Plnr-Cd':'PlnrCd',
+        'ABCD':'ABCD',
+        'BM':'BM',
+        'Cost':'Cost',
+        'Qty-OH':'QtyOH',
+        'Ext-OH':'ExtOH'
+
+    },
+    "columns_order_original": [
+        "Item-Number", "Description", "UM", "S", "WH", "Last-Date", "Bin", "Lot", "Rev", "Entity",
+        "PlanType", "Prj", "Prd-Grp", "MLI", "LT", "Plnr-Cd", "ABCD", "BM", "Cost", "Qty-OH", "Ext-OH"
+    ],
+
+    "columns_order_renamed": [
+        'ItemNo' ,'Description','UM' ,'S','WH' ,'LastDate', 'Bin' ,
+        'Lot', 'Rev' ,'Entity', 'PlanType','Prj','PrdGrp', 'MLI','LT','PlnrCd','ABCD','BM' ,'Cost'
+        , 'QtyOH', 'ExtOH'
+    ],
+    "special_processing": {
+        "clear_before_insert": True,
+        "custom_cleaning": False,
+        "final_columns_only": True
+    },
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS slowmotion(
+                            id INTEGER PRIMARY KEY,
+                            ItemNo TEXT,
+                            Description TEXT,
+                            UM TEXT,
+                            S TEXT,
+                            WH TEXT,
+                            LastDate TEXT,
+                            Bin TEXT,
+                            Lot TEXT,
+                            Rev TEXT,
+                            Entity TEXT,
+                            PlanType TEXT,
+                            Prj TEXT, 
+                            PrdGrp TEXT,
+                            MLI TEXT,
+                            LT TEXT,
+                            PlnrCd TEXT,
+                            ABCD TEXT,
+                            BM TEXT,
+                            Cost TEXT,
+                            QtyOH TEXT,
+                            ExtOH TEXT
+                        )"""
+},
 # ==================== TABLA RESPONSABLES ACTION WO by ENTITY====================
 "Work_order_Actions_responsibles_entity": {
     "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\ActionCodes\Responsible_by_entity.xlsx",
@@ -1746,6 +1820,14 @@ TABLES_CONFIG = {
         R4_Account TEXT
     )"""
 },
+
+# ==================== TABLA invoiced====================
+
+
+
+
+
+
 # ==================== TABLA RESPONSABLES ACTION WO by PLANTYPE====================
 "Work_order_Actions_responsibles_plantype": {
     "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\ActionCodes\Responsible_by_plantype.xlsx",

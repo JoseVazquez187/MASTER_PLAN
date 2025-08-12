@@ -36,8 +36,11 @@ class BackScheduleAnalyzer:
     def __init__(self):
         self.df = None
         self.metrics = {}
+        self.credit_memo_analyzer = CreditMemoAnalyzer()
+        self.psu_cleanup_analyzer = PSUCleanupAnalyzer()  
+        self.fcst_spr_analyzer = FcstSprAnalyzer()  # AGREGAR ESTA LÍNEA
 
-    def load_data_from_db(self, db_path=r"C:\Users\J.Vazquez\Desktop\PARCHE EXPEDITE\BS_Analisis_2025_08_04.db"):
+    def load_data_from_db(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
         """Cargar datos desde la base de datos SQLite"""
         try:
             print(f"Intentando conectar a: {db_path}")
@@ -45,7 +48,7 @@ class BackScheduleAnalyzer:
             query = """
                 SELECT EntityGroup, ItemNo, Description, DemandSource, AC, ShipDate, OH, MLIKCode, 
                     LT_TOTAL, ReqDate, ReqDate_Original
-                FROM expedite
+                FROM expedite_fill_doc
                 """
             self.df = pd.read_sql_query(query, conn)
             conn.close()
@@ -481,7 +484,7 @@ class BackScheduleAnalyzer:
             print(f"ERROR en export: {e}")
             return {"success": False, "message": f"Error: {str(e)}"}
 
-    def load_fcst_alignment_data(self, db_path=r"C:\Users\J.Vazquez\Desktop\R4Database.db"):
+    def load_fcst_alignment_data(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
         """Cargar y validar alineación de FCST con WO"""
         try:
             print(f"Conectando a R4Database: {db_path}")
@@ -559,7 +562,7 @@ class BackScheduleAnalyzer:
             self._create_sample_fcst_data()
             return False
 
-    def load_sales_order_alignment_data(self, db_path=r"C:\Users\J.Vazquez\Desktop\R4Database.db"):
+    def load_sales_order_alignment_data(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
         """Cargar y validar alineación de Sales Orders con Work Orders"""
         try:
             print(f"Conectando a R4Database para SO-WO: {db_path}")
@@ -613,13 +616,16 @@ class BackScheduleAnalyzer:
             
             # Eliminar registros sin fechas válidas
             initial_count = len(merged_df)
-            merged_df = merged_df.dropna(subset=['Prd_Dt', 'DueDt'])
+            # merged_df = merged_df.dropna(subset=['Prd_Dt', 'DueDt'])
+            merged_df = merged_df.dropna(subset=['Req_Dt', 'DueDt'])
+
             final_count = len(merged_df)
             
             print(f"📊 Registros con fechas válidas: {final_count}/{initial_count}")
             
             # Validar alineación: Prd_Dt (SO) vs DueDt (WO)
-            merged_df['Date_Diff_Days'] = (merged_df['DueDt'] - merged_df['Prd_Dt']).dt.days
+            # merged_df['Date_Diff_Days'] = (merged_df['DueDt'] - merged_df['Prd_Dt']).dt.days
+            merged_df['Date_Diff_Days'] = (merged_df['DueDt'] - merged_df['Req_Dt']).dt.days
             merged_df['Is_Aligned'] = merged_df['Date_Diff_Days'] == 0
             
             # Categorizar diferencias
@@ -661,7 +667,8 @@ class BackScheduleAnalyzer:
                 'matched_keys': int(merged_df['WO_Key'].notna().sum())
             }
             
-            print(f"✅ SO-WO Analysis completado: {alignment_pct:.1f}% alineación")
+            # print(f"✅ SO-WO Analysis completado: {alignment_pct:.1f}% alineación")
+            print(f"✅ SO(Req_Dt)-WO(DueDt) Analysis completado: {alignment_pct:.1f}% alineación")
             return True
             
         except Exception as e:
@@ -670,7 +677,7 @@ class BackScheduleAnalyzer:
             self._create_sample_so_data()
             return False
 
-    def load_wo_materials_analysis(self, db_path=r"C:\Users\J.Vazquez\Desktop\R4Database.db"):
+    def load_wo_materials_analysis(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
         """Cargar y analizar WO con/sin materiales (pr561)"""
         try:
             print(f"Conectando a R4Database para WO-Materials: {db_path}")
@@ -1151,9 +1158,7 @@ class BackScheduleAnalyzer:
         print(f"   ✅ Con materiales: {wo_with_materials} ({materials_pct:.1f}%)")
         print(f"   ❌ Sin materiales: {wo_without_materials} ({100-materials_pct:.1f}%)")
 
-    """aqui se agrego"""
-
-    def load_obsolete_expired_neteable_analysis(self, db_path=r"C:\Users\J.Vazquez\Desktop\R4Database.db"):
+    def load_obsolete_expired_neteable_analysis(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
         """Cargar y analizar materiales obsoletos/expirados en localidades neteables"""
         try:
             print(f"Conectando a R4Database para análisis OBS/EXP LOC NET: {db_path}")
@@ -2322,6 +2327,1409 @@ class BackScheduleAnalyzer:
             traceback.print_exc()
             return None
 
+# === PSU Cleanup Module ===
+class PSUCleanupAnalyzer:
+    def __init__(self):
+        self.df = None
+        self.ac_summary = None
+        self.metrics = {}
+        
+    def load_psu_cleanup_data(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
+        """Cargar y analizar datos de FCST para limpieza de PSU"""
+        try:
+            print(f"Conectando a R4Database para PSU Cleanup: {db_path}")
+            conn = sqlite3.connect(db_path)
+            
+            # Query específico para PSU Cleanup
+            psu_query = """
+            SELECT Entity, Proj, AC, ConfigID, FcstNo, Description, ItemNo, Rev, UM, 
+                   PlannedBy, ReqDate, QtyFcst, OpenQty, WO
+            FROM fcst 
+            WHERE OpenQty > 0 AND Entity = 'EZ4120'
+            """
+            
+            fcst_df = pd.read_sql_query(psu_query, conn)
+            conn.close()
+            
+            print(f"📊 FCST EZ4120 con OpenQty > 0: {len(fcst_df)}")
+            
+            # Procesar datos
+            self._process_psu_data(fcst_df)
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error cargando PSU Cleanup: {e}")
+            self._create_sample_psu_data()
+            return False
+
+    def _process_psu_data(self, fcst_df):
+        """Procesar datos para análisis PSU"""
+        # Filtrar avienes que NO comiencen con 'X'
+        initial_count = len(fcst_df)
+        fcst_df = fcst_df[~fcst_df['AC'].str.upper().str.startswith('X')]
+        filtered_count = len(fcst_df)
+        
+        print(f"📊 Filtrado avienes con X: {initial_count} -> {filtered_count} registros")
+        
+        # Contar facturables por AC
+        ac_counts = fcst_df.groupby('AC').agg({
+            'FcstNo': 'count',
+            'OpenQty': 'sum',
+            'ItemNo': 'nunique'
+        }).rename(columns={
+            'FcstNo': 'Facturables_Count',
+            'OpenQty': 'Total_OpenQty',
+            'ItemNo': 'Items_Unicos'
+        }).reset_index()
+        
+        # Clasificar avienes según número de facturables
+        ac_counts['Status'] = ac_counts['Facturables_Count'].apply(
+            lambda x: 'Bien Cargado (4 Facturables)' if x == 4
+                    else 'Necesita Limpieza (2 Facturables)' if x == 2
+                    else f'Revisar ({x} Facturables)'
+        )
+        
+        # Categorizar para prioridad
+        ac_counts['Priority'] = ac_counts['Facturables_Count'].apply(
+            lambda x: 'Normal' if x == 4
+                    else 'Alta' if x == 2
+                    else 'Media'
+        )
+        
+        # Agregar detalles de cada AC
+        details_list = []
+        for ac in ac_counts['AC']:
+            ac_details = fcst_df[fcst_df['AC'] == ac]
+            facturables_count = ac_counts[ac_counts['AC'] == ac]['Facturables_Count'].iloc[0]
+            status = ac_counts[ac_counts['AC'] == ac]['Status'].iloc[0]
+            priority = ac_counts[ac_counts['AC'] == ac]['Priority'].iloc[0]
+            
+            for _, row in ac_details.iterrows():
+                details_list.append({
+                    'AC': ac,
+                    'FcstNo': row['FcstNo'],
+                    'Description': row['Description'],
+                    'ItemNo': row['ItemNo'],
+                    'OpenQty': row['OpenQty'],
+                    'ReqDate': row['ReqDate'],
+                    'WO': row['WO'],
+                    'PlannedBy': row['PlannedBy'],
+                    'Facturables_Count': facturables_count,
+                    'Status': status,
+                    'Priority': priority
+                })
+        
+        self.df = pd.DataFrame(details_list)
+        self.ac_summary = ac_counts
+        
+        self._calculate_psu_metrics()
+        
+    def _calculate_psu_metrics(self):
+        """Calcular métricas PSU"""
+        if self.ac_summary is None or len(self.ac_summary) == 0:
+            return
+        
+        total_avienes = len(self.ac_summary)
+        bien_cargados = len(self.ac_summary[self.ac_summary['Facturables_Count'] == 4])
+        necesitan_limpieza = len(self.ac_summary[self.ac_summary['Facturables_Count'] == 2])
+        otros = total_avienes - bien_cargados - necesitan_limpieza
+        
+        # Porcentajes
+        bien_cargados_pct = (bien_cargados / total_avienes * 100) if total_avienes > 0 else 0
+        necesitan_limpieza_pct = (necesitan_limpieza / total_avienes * 100) if total_avienes > 0 else 0
+        otros_pct = (otros / total_avienes * 100) if total_avienes > 0 else 0
+        
+        # Top avienes que necesitan limpieza (por OpenQty)
+        need_cleanup = self.ac_summary[self.ac_summary['Facturables_Count'] == 2].sort_values('Total_OpenQty', ascending=False)
+        top_cleanup_ac = need_cleanup['AC'].tolist()[:10]
+        
+        # Facturables promedio
+        avg_facturables = self.ac_summary['Facturables_Count'].mean()
+        
+        self.metrics = {
+            'total_avienes': total_avienes,
+            'bien_cargados': bien_cargados,
+            'necesitan_limpieza': necesitan_limpieza,
+            'otros': otros,
+            'bien_cargados_pct': round(bien_cargados_pct, 2),
+            'necesitan_limpieza_pct': round(necesitan_limpieza_pct, 2),
+            'otros_pct': round(otros_pct, 2),
+            'avg_facturables': round(avg_facturables, 2),
+            'top_cleanup_ac': top_cleanup_ac,
+            'total_facturables': len(self.df),
+            'efficiency_score': round(bien_cargados_pct, 1)
+        }
+        
+        print(f"✅ PSU Cleanup Analysis completado:")
+        print(f"   📊 Total avienes: {total_avienes}")
+        print(f"   ✅ Bien cargados (4 facturables): {bien_cargados} ({bien_cargados_pct:.1f}%)")
+        print(f"   🔧 Necesitan limpieza (2 facturables): {necesitan_limpieza} ({necesitan_limpieza_pct:.1f}%)")
+        print(f"   ⚠️ Otros: {otros} ({otros_pct:.1f}%)")
+
+    def _create_sample_psu_data(self):
+        """Crear datos de ejemplo para PSU Cleanup"""
+        np.random.seed(42)
+        
+        # Crear avienes simulados (sin X al inicio)
+        avienes = [f"AC{1000+i:04d}" for i in range(50)]
+        
+        ac_summary_data = []
+        details_data = []
+        
+        for ac in avienes:
+            # 60% bien cargados (4), 30% necesitan limpieza (2), 10% otros
+            if np.random.random() < 0.6:
+                facturables_count = 4
+            elif np.random.random() < 0.85:  # 30% de los restantes
+                facturables_count = 2
+            else:
+                facturables_count = np.random.choice([1, 3, 5, 6])
+            
+            total_openqty = np.random.randint(100, 1000)
+            items_unicos = facturables_count
+            
+            # Datos del resumen
+            status = ('Bien Cargado (4 Facturables)' if facturables_count == 4
+                     else 'Necesita Limpieza (2 Facturables)' if facturables_count == 2
+                     else f'Revisar ({facturables_count} Facturables)')
+            
+            priority = ('Normal' if facturables_count == 4
+                       else 'Alta' if facturables_count == 2
+                       else 'Media')
+            
+            ac_summary_data.append({
+                'AC': ac,
+                'Facturables_Count': facturables_count,
+                'Total_OpenQty': total_openqty,
+                'Items_Unicos': items_unicos,
+                'Status': status,
+                'Priority': priority
+            })
+            
+            # Crear detalles individuales
+            for i in range(facturables_count):
+                details_data.append({
+                    'AC': ac,
+                    'FcstNo': f"FCST-{ac}-{i+1:02d}",
+                    'Description': f"Facturable {i+1} para {ac}",
+                    'ItemNo': f"ITEM-{ac}-{i+1:02d}",
+                    'OpenQty': total_openqty // facturables_count,
+                    'ReqDate': datetime(2025, 8, 1) + timedelta(days=np.random.randint(0, 60)),
+                    'WO': f"WO-{ac}-{i+1:02d}" if np.random.random() > 0.2 else "",
+                    'PlannedBy': f"PLANNER{i%3 + 1}",
+                    'Facturables_Count': facturables_count,
+                    'Status': status,
+                    'Priority': priority
+                })
+        
+        self.ac_summary = pd.DataFrame(ac_summary_data)
+        self.df = pd.DataFrame(details_data)
+        
+        self._calculate_psu_metrics()
+        print("🧪 Datos de ejemplo PSU Cleanup creados")
+
+    def export_psu_cleanup_analysis(self, export_path=None):
+        """Exportar análisis completo de PSU Cleanup"""
+        if self.df is None or len(self.df) == 0:
+            return {"success": False, "message": "No hay datos para exportar"}
+        
+        try:
+            # Cargar datos de expedite para aviones sucios
+            self.load_expedite_data_for_dirty_planes()
+            
+            if export_path is None:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                export_path = f"PSU_Cleanup_Analysis_{timestamp}.xlsx"
+            
+            with pd.ExcelWriter(export_path, engine='openpyxl') as writer:
+                # Resumen por AC
+                self.ac_summary.to_excel(writer, sheet_name='AC_Summary', index=False)
+                
+                # Datos completos de facturables
+                self.df.to_excel(writer, sheet_name='Facturables_Details', index=False)
+                
+                # Avienes que necesitan limpieza
+                need_cleanup = self.ac_summary[self.ac_summary['Facturables_Count'] == 2]
+                need_cleanup.to_excel(writer, sheet_name='Necesitan_Limpieza', index=False)
+                
+                # NUEVO: Expedite para aviones sucios
+                if hasattr(self, 'expedite_data') and len(self.expedite_data) > 0:
+                    # Exportar datos completos de expedite
+                    self.expedite_data.to_excel(writer, sheet_name='Expedite_Aviones_Sucios', index=False)
+                    
+                    # Limpiar datos antes del groupby
+                    expedite_clean = self.expedite_data.copy()
+                    expedite_clean['ReqQty'] = pd.to_numeric(expedite_clean['ReqQty'], errors='coerce').fillna(0)
+                    expedite_clean['OH'] = pd.to_numeric(expedite_clean['OH'], errors='coerce').fillna(0)
+                    
+                    expedite_summary = expedite_clean.groupby('AC').agg({
+                        'ItemNo': 'count',
+                        'ReqQty': 'sum',
+                        'OH': 'sum'
+                    }).rename(columns={
+                        'ItemNo': 'Items_Count',
+                        'ReqQty': 'Total_ReqQty',
+                        'OH': 'Total_OH'
+                    }).reset_index()
+                    
+                    # Redondear valores numéricos
+                    expedite_summary['Total_ReqQty'] = expedite_summary['Total_ReqQty'].round(2)
+                    expedite_summary['Total_OH'] = expedite_summary['Total_OH'].round(2)
+                    
+                    expedite_summary.to_excel(writer, sheet_name='Expedite_Summary_by_AC', index=False)
+                    
+                    # Exportar datos financieros (sin ASYFNL)
+                    if hasattr(self, 'expedite_financial') and len(self.expedite_financial) > 0:
+                        self.expedite_financial.to_excel(writer, sheet_name='Expedite_Financial_Impact', index=False)
+                        
+                        # Resumen financiero por AC
+                        financial_by_ac = self.expedite_financial.groupby('AC').agg({
+                            'ItemNo': 'count',
+                            'ReqQty': 'sum',
+                            'Std-Cost': 'mean',
+                            'Financial_Impact': 'sum'
+                        }).rename(columns={
+                            'ItemNo': 'Items_Count',
+                            'ReqQty': 'Total_ReqQty',
+                            'Std-Cost': 'Avg_StdCost',
+                            'Financial_Impact': 'Total_Financial_Impact'
+                        }).reset_index()
+                        
+                        financial_by_ac['Total_Financial_Impact'] = financial_by_ac['Total_Financial_Impact'].round(2)
+                        financial_by_ac['Avg_StdCost'] = financial_by_ac['Avg_StdCost'].round(2)
+                        
+                        financial_by_ac.to_excel(writer, sheet_name='Financial_Impact_by_AC', index=False)
+                    
+                    expedite_count = len(self.expedite_data)
+                    expedite_ac_count = self.expedite_data['AC'].nunique()
+                else:
+                    # Crear hoja vacía si no hay datos de expedite
+                    expedite_count = 0
+                    expedite_ac_count = 0
+                    empty_expedite = pd.DataFrame({
+                        'Mensaje': ['No hay datos de expedite para aviones que necesitan limpieza']
+                    })
+                    empty_expedite.to_excel(writer, sheet_name='Expedite_Aviones_Sucios', index=False)
+                
+                # Avienes bien cargados
+                bien_cargados = self.ac_summary[self.ac_summary['Facturables_Count'] == 4]
+                bien_cargados.to_excel(writer, sheet_name='Bien_Cargados', index=False)
+                
+                # Otros casos (revisión manual)
+                otros = self.ac_summary[~self.ac_summary['Facturables_Count'].isin([2, 4])]
+                if len(otros) > 0:
+                    otros.to_excel(writer, sheet_name='Otros_Casos', index=False)
+                
+                # Resumen de métricas ACTUALIZADO
+                financial_impact = self.financial_metrics.get('total_financial_impact', 0) if hasattr(self, 'financial_metrics') else 0
+                financial_items = self.financial_metrics.get('financial_items_count', 0) if hasattr(self, 'financial_metrics') else 0
+                
+                summary_data = {
+                    'Métrica': [
+                        'Total Avienes Analizados',
+                        'Bien Cargados (4 Facturables)',
+                        'Necesitan Limpieza (2 Facturables)',
+                        'Otros Casos',
+                        '% Bien Cargados',
+                        '% Necesitan Limpieza',
+                        '% Otros',
+                        'Promedio Facturables',
+                        'Total Facturables',
+                        'Score de Eficiencia',
+                        'Items Expedite (Aviones Sucios)',
+                        'Aviones con Expedite Data',
+                        'Impacto Financiero Total (sin ASYFNL)',
+                        'Items Financieros (sin ASYFNL)'
+                    ],
+                    'Valor': [
+                        self.metrics.get('total_avienes', 0),
+                        self.metrics.get('bien_cargados', 0),
+                        self.metrics.get('necesitan_limpieza', 0),
+                        self.metrics.get('otros', 0),
+                        f"{self.metrics.get('bien_cargados_pct', 0)}%",
+                        f"{self.metrics.get('necesitan_limpieza_pct', 0)}%",
+                        f"{self.metrics.get('otros_pct', 0)}%",
+                        self.metrics.get('avg_facturables', 0),
+                        self.metrics.get('total_facturables', 0),
+                        f"{self.metrics.get('efficiency_score', 0)}%",
+                        expedite_count,
+                        expedite_ac_count,
+                        f"${financial_impact:,.2f}",
+                        financial_items
+                    ]
+                }
+                pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary_Metrics', index=False)
+            
+            full_path = os.path.abspath(export_path)
+            return {
+                "success": True,
+                "message": f"Exportado: {os.path.basename(export_path)}",
+                "path": full_path,
+                "expedite_items": expedite_count,
+                "expedite_ac_count": expedite_ac_count,
+                "financial_impact": financial_impact
+            }
+            
+        except Exception as e:
+            print(f"❌ Error en export_psu_cleanup_analysis: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"success": False, "message": f"Error: {str(e)}"}
+    
+    def create_psu_cleanup_chart(self):
+        """Crear gráfico de análisis PSU Cleanup"""
+        if self.ac_summary is None or len(self.ac_summary) == 0:
+            return None
+        
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            
+            plt.style.use('dark_background')
+            fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(30, 16))
+            fig.patch.set_facecolor(COLORS['surface'])
+            
+            # GRÁFICO 1: Pie Chart - Status General
+            status_counts = self.ac_summary['Status'].value_counts()
+            if len(status_counts) > 0:
+                colors = ['#4ECDC4', '#FF6B6B', '#FFA726', '#AB47BC']
+                labels = [label.replace(' ', '\n') for label in status_counts.index]
+                
+                wedges, texts, autotexts = ax1.pie(status_counts.values, labels=labels, 
+                                                   colors=colors[:len(status_counts)], autopct='%1.1f%%',
+                                                   startangle=90, textprops={'color': 'white', 'fontsize': 10})
+                
+                for autotext in autotexts:
+                    autotext.set_color('white')
+                    autotext.set_fontweight('bold')
+                
+                ax1.set_title('Distribución de Status PSU\n(Limpieza de Facturables)', 
+                             color='white', fontsize=16, fontweight='bold', pad=20)
+            
+            ax1.set_facecolor('#2C3E50')
+            
+            # GRÁFICO 2: Barras - Facturables por Count
+            facturables_dist = self.ac_summary['Facturables_Count'].value_counts().sort_index()
+            if len(facturables_dist) > 0:
+                bars = ax2.bar(facturables_dist.index, facturables_dist.values, 
+                              color='#45B7D1', alpha=0.8, edgecolor='white', linewidth=1)
+                
+                for bar, value in zip(bars, facturables_dist.values):
+                    height = bar.get_height()
+                    ax2.text(bar.get_x() + bar.get_width()/2., height + max(facturables_dist.values)*0.01,
+                            f'{int(value)}', ha='center', va='bottom', 
+                            color='white', fontsize=12, fontweight='bold')
+                
+                ax2.set_title('Distribución por Número de Facturables', 
+                             color='white', fontsize=16, fontweight='bold', pad=20)
+                ax2.set_xlabel('Número de Facturables', color='white', fontsize=14)
+                ax2.set_ylabel('Cantidad de Avienes', color='white', fontsize=14)
+                ax2.axvline(x=4, color='green', linestyle='--', linewidth=2, alpha=0.7, label='Ideal (4)')
+                ax2.axvline(x=2, color='red', linestyle='--', linewidth=2, alpha=0.7, label='Necesita Limpieza (2)')
+                ax2.legend()
+                ax2.grid(True, alpha=0.3, color='white', axis='y')
+            
+            ax2.set_facecolor('#2C3E50')
+            ax2.tick_params(colors='white')
+            for spine in ax2.spines.values():
+                spine.set_color('white')
+            
+            # GRÁFICO 3: Top 10 avienes que necesitan limpieza
+            need_cleanup = self.ac_summary[self.ac_summary['Facturables_Count'] == 2].sort_values('Total_OpenQty', ascending=False).head(10)
+            if len(need_cleanup) > 0:
+                y_pos = range(len(need_cleanup))
+                bars = ax3.barh(y_pos, need_cleanup['Total_OpenQty'], color='#FF6B6B', alpha=0.8)
+                
+                for i, bar in enumerate(bars):
+                    width = bar.get_width()
+                    ax3.text(width + width*0.01, bar.get_y() + bar.get_height()/2,
+                            f'{int(width)}', ha='left', va='center', 
+                            color='white', fontsize=10, fontweight='bold')
+                
+                ax3.set_yticks(y_pos)
+                ax3.set_yticklabels(need_cleanup['AC'], fontsize=10)
+                ax3.set_title('Top 10 Avienes que Necesitan Limpieza\n(Por OpenQty)', 
+                             color='white', fontsize=16, fontweight='bold', pad=20)
+                ax3.set_xlabel('Total OpenQty', color='white', fontsize=14)
+                ax3.grid(True, alpha=0.3, color='white', axis='x')
+            else:
+                ax3.text(0.5, 0.5, '¡Todos los avienes están bien!', ha='center', va='center',
+                        color='green', fontsize=16, transform=ax3.transAxes)
+            
+            ax3.set_facecolor('#2C3E50')
+            ax3.tick_params(colors='white')
+            for spine in ax3.spines.values():
+                spine.set_color('white')
+            
+            # GRÁFICO 4: Histograma OpenQty
+            openqty_data = self.ac_summary['Total_OpenQty']
+            if len(openqty_data) > 0:
+                n, bins, patches = ax4.hist(openqty_data, bins=20, alpha=0.7, 
+                                           color='#4ECDC4', edgecolor='white', linewidth=0.5)
+                
+                mean_val = openqty_data.mean()
+                ax4.axvline(x=mean_val, color='yellow', linestyle='--', 
+                           linewidth=2, label=f'Promedio: {mean_val:.0f}')
+                
+                ax4.set_title('Distribución de OpenQty por Avión', 
+                             color='white', fontsize=16, fontweight='bold', pad=20)
+                ax4.set_xlabel('Total OpenQty', color='white', fontsize=14)
+                ax4.set_ylabel('Cantidad de Avienes', color='white', fontsize=14)
+                ax4.legend(loc='upper right', fontsize=12)
+                ax4.grid(True, alpha=0.3, color='white')
+            
+            ax4.set_facecolor('#2C3E50')
+            ax4.tick_params(colors='white')
+            for spine in ax4.spines.values():
+                spine.set_color('white')
+            
+            # GRÁFICO 5: Barras por Prioridad
+            priority_counts = self.ac_summary['Priority'].value_counts()
+            if len(priority_counts) > 0:
+                color_map = {'Alta': '#FF6B6B', 'Media': '#FFA726', 'Normal': '#4ECDC4'}
+                colors = [color_map.get(p, '#888888') for p in priority_counts.index]
+                
+                bars = ax5.bar(range(len(priority_counts)), priority_counts.values, 
+                              color=colors, alpha=0.8, edgecolor='white', linewidth=1)
+                
+                for bar, value in zip(bars, priority_counts.values):
+                    height = bar.get_height()
+                    ax5.text(bar.get_x() + bar.get_width()/2., height + max(priority_counts.values)*0.01,
+                            f'{int(value)}', ha='center', va='bottom', 
+                            color='white', fontsize=12, fontweight='bold')
+                
+                ax5.set_xticks(range(len(priority_counts)))
+                ax5.set_xticklabels(priority_counts.index)
+                ax5.set_title('Distribución por Prioridad de Limpieza', 
+                             color='white', fontsize=16, fontweight='bold', pad=20)
+                ax5.set_ylabel('Cantidad de Avienes', color='white', fontsize=14)
+                ax5.grid(True, alpha=0.3, color='white', axis='y')
+            
+            ax5.set_facecolor('#2C3E50')
+            ax5.tick_params(colors='white')
+            for spine in ax5.spines.values():
+                spine.set_color('white')
+            
+            # GRÁFICO 6: Scatter Facturables vs OpenQty
+            if len(self.ac_summary) > 0:
+                scatter = ax6.scatter(self.ac_summary['Facturables_Count'], self.ac_summary['Total_OpenQty'], 
+                                     c=self.ac_summary['Total_OpenQty'], cmap='Reds', alpha=0.6, s=50)
+                
+                ax6.set_title('Facturables vs OpenQty por Avión', 
+                             color='white', fontsize=16, fontweight='bold', pad=20)
+                ax6.set_xlabel('Número de Facturables', color='white', fontsize=14)
+                ax6.set_ylabel('Total OpenQty', color='white', fontsize=14)
+                ax6.axvline(x=4, color='green', linestyle='--', linewidth=2, alpha=0.7, label='Ideal (4)')
+                ax6.axvline(x=2, color='red', linestyle='--', linewidth=2, alpha=0.7, label='Necesita Limpieza (2)')
+                ax6.legend()
+                ax6.grid(True, alpha=0.3, color='white')
+                
+                # Colorbar
+                cbar = plt.colorbar(scatter, ax=ax6)
+                cbar.set_label('Total OpenQty', color='white', fontsize=12)
+                cbar.ax.tick_params(colors='white')
+            
+            ax6.set_facecolor('#2C3E50')
+            ax6.tick_params(colors='white')
+            for spine in ax6.spines.values():
+                spine.set_color('white')
+            
+            plt.tight_layout(pad=3.0)
+            
+            # Convertir a base64
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', facecolor=COLORS['surface'], 
+                       bbox_inches='tight', dpi=150)
+            buffer.seek(0)
+            chart_base64 = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            return chart_base64
+            
+        except Exception as e:
+            print(f"Error creando gráfico PSU Cleanup: {e}")
+            return None
+
+    def load_expedite_data_for_dirty_planes(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
+        """Cargar datos de expedite para aviones que necesitan limpieza"""
+        try:
+            if self.ac_summary is None:
+                print("⚠️ No hay datos de AC Summary. Ejecuta load_psu_cleanup_data() primero.")
+                return False
+            
+            # Obtener lista de aviones que necesitan limpieza (2 facturables)
+            dirty_planes = self.ac_summary[self.ac_summary['Facturables_Count'] == 2]['AC'].tolist()
+            
+            if not dirty_planes:
+                print("✅ No hay aviones que necesiten limpieza")
+                self.expedite_data = pd.DataFrame()
+                return True
+            
+            print(f"🔍 Buscando expedite para {len(dirty_planes)} aviones que necesitan limpieza...")
+            
+            conn = sqlite3.connect(db_path)
+            
+            # Crear query para todos los aviones sucios
+            ac_list = "', '".join(dirty_planes)
+            expedite_query = f"""
+            SELECT id, EntityGroup, Project, AC, ItemNo, Description, PlanTp, Ref, Sub, FillDoc,
+                DemandType, Sort, ReqQty, DemandSource, Unit, Vendor, ReqDate, ShipDate, OH,
+                MLIKCode, LT, "Std-Cost", LotSize, UOM
+            FROM expedite 
+            WHERE EntityGroup = 'EZ4120' AND AC IN ('{ac_list}')
+            ORDER BY AC, ItemNo
+            """
+            
+            print(f"📊 Query ejecutándose para AC: {dirty_planes}")
+            
+            self.expedite_data = pd.read_sql_query(expedite_query, conn)
+            conn.close()
+            
+            print(f"✅ Expedite data cargado: {len(self.expedite_data)} registros para aviones sucios")
+            
+            # NUEVO: Limpiar y convertir datos numéricos
+            print("🔧 Limpiando datos numéricos...")
+            
+            # Limpiar ReqQty
+            self.expedite_data['ReqQty'] = pd.to_numeric(self.expedite_data['ReqQty'], errors='coerce').fillna(0)
+            
+            # Limpiar OH
+            self.expedite_data['OH'] = pd.to_numeric(self.expedite_data['OH'], errors='coerce').fillna(0)
+            
+            # Limpiar LT
+            self.expedite_data['LT'] = pd.to_numeric(self.expedite_data['LT'], errors='coerce').fillna(0)
+            
+            # Limpiar Std-Cost
+            self.expedite_data['Std-Cost'] = pd.to_numeric(self.expedite_data['Std-Cost'], errors='coerce').fillna(0)
+            
+            # Limpiar LotSize
+            self.expedite_data['LotSize'] = pd.to_numeric(self.expedite_data['LotSize'], errors='coerce').fillna(0)
+            
+            # NUEVO: Filtrar y calcular impacto financiero
+            print("💰 Calculando impacto financiero...")
+            
+            # Filtrar: excluir PlanTp = 'ASYFNL'
+            initial_count = len(self.expedite_data)
+            self.expedite_financial = self.expedite_data[self.expedite_data['PlanTp'] != 'ASYFNL'].copy()
+            filtered_count = len(self.expedite_financial)
+            
+            print(f"📊 Filtro financiero aplicado: {initial_count} -> {filtered_count} registros (excluidos ASYFNL)")
+            
+            # Calcular impacto financiero: ReqQty * Std-Cost
+            self.expedite_financial['Financial_Impact'] = self.expedite_financial['ReqQty'] * self.expedite_financial['Std-Cost']
+            
+            # Métricas financieras
+            self.financial_metrics = {
+                'total_financial_impact': float(self.expedite_financial['Financial_Impact'].sum()),
+                'avg_financial_impact': float(self.expedite_financial['Financial_Impact'].mean()) if len(self.expedite_financial) > 0 else 0,
+                'financial_items_count': len(self.expedite_financial),
+                'excluded_asyfnl_count': initial_count - filtered_count,
+                'financial_ac_count': self.expedite_financial['AC'].nunique() if len(self.expedite_financial) > 0 else 0
+            }
+            
+            print(f"💰 Impacto financiero calculado:")
+            print(f"   Total: ${self.financial_metrics['total_financial_impact']:,.2f}")
+            print(f"   Items financieros: {self.financial_metrics['financial_items_count']:,}")
+            print(f"   Excluidos ASYFNL: {self.financial_metrics['excluded_asyfnl_count']:,}")
+            
+            print(f"📊 Después de limpiar:")
+            print(f"   ReqQty válidos: {self.expedite_data['ReqQty'].notna().sum()}")
+            print(f"   ReqQty total: {self.expedite_data['ReqQty'].sum():.2f}")
+            print(f"   OH total: {self.expedite_data['OH'].sum():.2f}")
+            
+            # Procesar fechas con formato específico
+            print("🔧 Procesando fechas...")
+            self.expedite_data['ReqDate'] = pd.to_datetime(self.expedite_data['ReqDate'], errors='coerce', format='%Y-%m-%d')
+            self.expedite_data['ShipDate'] = pd.to_datetime(self.expedite_data['ShipDate'], errors='coerce', format='%Y-%m-%d')
+            
+            # Agregar información de limpieza
+            self.expedite_data = self.expedite_data.merge(
+                self.ac_summary[['AC', 'Status', 'Priority', 'Facturables_Count']],
+                on='AC',
+                how='left'
+            )
+            
+            print(f"✅ Datos procesados correctamente")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error cargando expedite data: {e}")
+            import traceback
+            traceback.print_exc()
+            self.expedite_data = pd.DataFrame()
+            return False
+
+# === Credit Memos Module ===
+class CreditMemoAnalyzer:
+    def __init__(self):
+        self.df = None
+        self.metrics = {}
+        self.reason_mapping = {
+            "RFC": "RETURN FOR CUSTOMER",
+            "OEE": "ORDER ENTRY ERROR", 
+            "INE": "INVOICE ERROR",
+            "PNS": "PARTS NOT SHIPPED",
+            "CBC": "CAUSED BY CUSTOMER",
+            "TDL": "TRANSIT DAMAGE LOSS"
+        }
+
+    def load_credit_memo_data(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
+        """Cargar y procesar datos de Credit Memos desde R4Database"""
+        try:
+            print(f"Conectando a R4Database para Credit Memos: {db_path}")
+            conn = sqlite3.connect(db_path)
+            
+            # Cargar Sales Orders - SOLO CON CANTIDAD ABIERTA > 0
+            so_query = """
+            SELECT SO_No, Ln, Cust_PO, Req_Dt, Spr_CD, ML, 
+            Item_Number, Description, PlanType, Opn_Q, Issue_Q, OH_Netable
+            FROM sales_order_table 
+            WHERE Opn_Q > 0
+            """
+            so_df = pd.read_sql_query(so_query, conn)
+            so_df['SO_Line'] = so_df['SO_No'].astype(str) + '-' + so_df['Ln'].astype(str)
+            print(f"📊 Sales Orders con Opn_Q > 0: {len(so_df)}")
+            
+            # Cargar Credit Memos
+            cm_query = """
+            SELECT SO_No, Line, Invoice_No, CM_Reason, User_Id, Issue_Date, Invoice_Line_Memo
+            FROM Credit_Memos
+            WHERE Invoice_No IS NOT NULL AND Invoice_No != ''
+            """
+            cm_df = pd.read_sql_query(cm_query, conn)
+            cm_df['SO_Line'] = cm_df['SO_No'].astype(str) + '-' + cm_df['Line'].astype(str)
+            print(f"📋 Credit Memos: {len(cm_df)}")
+            
+            # Join datos - INNER JOIN para solo coincidencias
+            merged_df = pd.merge(so_df, cm_df, on='SO_Line', how='inner')
+            print(f"🔗 Coincidencias SO con Opn_Q > 0 y CM: {len(merged_df)}")
+            
+            conn.close()
+            
+            # Procesar datos
+            merged_df['CM_Reason'] = merged_df['CM_Reason'].str.upper()
+            merged_df['CM_Reason_Full'] = merged_df['CM_Reason'].map(self.reason_mapping).fillna('CHECK REASON')
+            merged_df['Issue_Date'] = pd.to_datetime(merged_df['Issue_Date'], errors='coerce')
+            merged_df['Req_Dt'] = pd.to_datetime(merged_df['Req_Dt'], errors='coerce')
+            
+            # Agregar información adicional para análisis
+            merged_df['Has_Open_Qty'] = merged_df['Opn_Q'] > 0
+            merged_df['Value_Impact'] = merged_df['Issue_Q'] * 50  # Estimación de valor unitario
+            
+            # Calcular días desde Issue_Date hasta hoy
+            today = pd.Timestamp.now()
+            merged_df['days_to_today'] = (today - merged_df['Issue_Date']).dt.days
+            
+            self.df = merged_df
+            self._calculate_credit_memo_metrics()
+            
+            print(f"✅ Credit Memos procesados: {len(merged_df)} registros")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error cargando Credit Memos: {e}")
+            self._create_sample_credit_memo_data()
+            return False
+
+    def _calculate_credit_memo_metrics(self):
+        """Calcular métricas de Credit Memos"""
+        if self.df is None or len(self.df) == 0:
+            return
+        
+        total = len(self.df)
+        unique_invoices = self.df['Invoice_No'].nunique()
+        unique_suppliers = self.df['Spr_CD'].nunique()
+        total_issue_qty = int(self.df['Issue_Q'].sum())
+        total_open_qty = int(self.df['Opn_Q'].sum())
+        avg_issue_qty = float(self.df['Issue_Q'].mean())
+        avg_days_to_today = float(self.df['days_to_today'].mean())
+        
+        # Top reason
+        top_reason = self.df['CM_Reason_Full'].mode().iloc[0] if not self.df['CM_Reason_Full'].empty else 'N/A'
+        
+        # Análisis por supplier
+        supplier_impact = self.df.groupby('Spr_CD').agg({
+            'SO_Line': 'count',
+            'Issue_Q': 'sum'
+        }).sort_values('SO_Line', ascending=False)
+        
+        self.metrics = {
+            'total_cms': total,
+            'unique_invoices': unique_invoices,
+            'unique_suppliers': unique_suppliers,
+            'total_issue_qty': total_issue_qty,
+            'total_open_qty': total_open_qty,
+            'avg_issue_qty': round(avg_issue_qty, 2),
+            'avg_days_to_today': round(avg_days_to_today, 1),
+            'top_reason': top_reason,
+            'supplier_impact': supplier_impact
+        }
+
+    def _create_sample_credit_memo_data(self):
+        """Crear datos de ejemplo para Credit Memos"""
+        np.random.seed(42)
+        n_records = 100
+        
+        # Datos simulados
+        so_numbers = [f"SO-{4000+i:04d}" for i in range(30)]
+        suppliers = ['SUP001', 'SUP002', 'SUP003', 'SUP004', 'SUP005']
+        users = ['USER01', 'USER02', 'USER03', 'USER04']
+        reasons = list(self.reason_mapping.keys())
+        
+        data = []
+        for i in range(n_records):
+            so_no = np.random.choice(so_numbers)
+            line = np.random.randint(1, 5)
+            
+            record = {
+                'SO_No_x': so_no,
+                'Ln': line,
+                'SO_Line': f"{so_no}-{line}",
+                'Cust_PO': f"PO-{1000+i:04d}",
+                'Req_Dt': datetime(2025, 8, 1) + timedelta(days=np.random.randint(-30, 30)),
+                'Spr_CD': np.random.choice(suppliers),
+                'ML': f"ML{i%3}",
+                'Item_Number': f"ITEM-CM-{100+i:03d}",
+                'Description': f"Credit Memo Item {i}",
+                'PlanType': np.random.choice(['MTO', 'MTS', 'BUY']),
+                'Opn_Q': np.random.randint(1, 100),
+                'Issue_Q': np.random.randint(1, 50),
+                'OH_Netable': np.random.randint(0, 200),
+                'SO_No_y': so_no,
+                'Line': line,
+                'Invoice_No': f"INV-{2000+i//3:04d}",
+                'CM_Reason': np.random.choice(reasons),
+                'User_Id': np.random.choice(users),
+                'Issue_Date': datetime(2025, 7, 1) + timedelta(days=np.random.randint(0, 40)),
+                'Invoice_Line_Memo': f"Memo for line {i}"
+            }
+            data.append(record)
+        
+        self.df = pd.DataFrame(data)
+        
+        # Procesar igual que datos reales
+        self.df['CM_Reason'] = self.df['CM_Reason'].str.upper()
+        self.df['CM_Reason_Full'] = self.df['CM_Reason'].map(self.reason_mapping).fillna('CHECK REASON')
+        self.df['Issue_Date'] = pd.to_datetime(self.df['Issue_Date'])
+        self.df['Req_Dt'] = pd.to_datetime(self.df['Req_Dt'])
+        self.df['Has_Open_Qty'] = self.df['Opn_Q'] > 0
+        self.df['Value_Impact'] = self.df['Issue_Q'] * 50
+        
+        today = pd.Timestamp.now()
+        self.df['days_to_today'] = (today - self.df['Issue_Date']).dt.days
+        
+        self._calculate_credit_memo_metrics()
+        print("🧪 Datos de ejemplo Credit Memos creados")
+
+    def create_credit_memo_chart(self):
+        """Crear gráfico de análisis Credit Memos"""
+        if self.df is None or len(self.df) == 0:
+            return None
+        
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            
+            plt.style.use('dark_background')
+            fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(30, 16))
+            fig.patch.set_facecolor(COLORS['surface'])
+            
+            # GRÁFICO 1: Pie Chart - Distribución por Reason
+            reason_counts = self.df['CM_Reason_Full'].value_counts().head(8)
+            if len(reason_counts) > 0:
+                colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA726', '#AB47BC', '#66BB6A', '#EF5350', '#26C6DA']
+                wedges, texts, autotexts = ax1.pie(reason_counts.values, labels=reason_counts.index, 
+                                                   colors=colors[:len(reason_counts)], autopct='%1.1f%%',
+                                                   startangle=90, textprops={'color': 'white', 'fontsize': 10})
+                
+                for autotext in autotexts:
+                    autotext.set_color('white')
+                    autotext.set_fontweight('bold')
+                
+                ax1.set_title('Distribución por Razón de Credit Memo', 
+                             color='white', fontsize=16, fontweight='bold', pad=20)
+            else:
+                ax1.text(0.5, 0.5, 'No hay datos de razones', ha='center', va='center',
+                        color='white', fontsize=16, transform=ax1.transAxes)
+            
+            ax1.set_facecolor('#2C3E50')
+            
+            # GRÁFICO 2: Barras por Supplier
+            supplier_counts = self.df['Spr_CD'].value_counts().head(10)
+            if len(supplier_counts) > 0:
+                bars = ax2.bar(range(len(supplier_counts)), supplier_counts.values, 
+                              color='#45B7D1', alpha=0.8, edgecolor='white', linewidth=1)
+                
+                for bar, value in zip(bars, supplier_counts.values):
+                    height = bar.get_height()
+                    ax2.text(bar.get_x() + bar.get_width()/2., height + max(supplier_counts.values)*0.01,
+                            f'{int(value)}', ha='center', va='bottom', 
+                            color='white', fontsize=10, fontweight='bold')
+                
+                ax2.set_xticks(range(len(supplier_counts)))
+                ax2.set_xticklabels(supplier_counts.index, rotation=45, ha='right')
+                ax2.set_title('Top 10 Suppliers por Credit Memos', 
+                             color='white', fontsize=16, fontweight='bold', pad=20)
+                ax2.set_ylabel('Cantidad de CMs', color='white', fontsize=14)
+                ax2.grid(True, alpha=0.3, color='white', axis='y')
+            else:
+                ax2.text(0.5, 0.5, 'No hay datos de suppliers', ha='center', va='center',
+                        color='white', fontsize=16, transform=ax2.transAxes)
+            
+            ax2.set_facecolor('#2C3E50')
+            ax2.tick_params(colors='white')
+            for spine in ax2.spines.values():
+                spine.set_color('white')
+            
+            # GRÁFICO 3: Histograma de Issue_Q
+            issue_q_data = self.df['Issue_Q'].dropna()
+            if len(issue_q_data) > 0:
+                n, bins, patches = ax3.hist(issue_q_data, bins=30, alpha=0.7, 
+                                           color='#4ECDC4', edgecolor='white', linewidth=0.5)
+                
+                mean_val = issue_q_data.mean()
+                ax3.axvline(x=mean_val, color='yellow', linestyle='--', 
+                           linewidth=2, label=f'Promedio: {mean_val:.1f}')
+                
+                ax3.set_title('Distribución de Issue Quantity', 
+                             color='white', fontsize=16, fontweight='bold', pad=20)
+                ax3.set_xlabel('Issue Quantity', color='white', fontsize=14)
+                ax3.set_ylabel('Frecuencia', color='white', fontsize=14)
+                ax3.legend(loc='upper right', fontsize=12)
+                ax3.grid(True, alpha=0.3, color='white')
+            else:
+                ax3.text(0.5, 0.5, 'No hay datos de Issue_Q', ha='center', va='center',
+                        color='white', fontsize=16, transform=ax3.transAxes)
+            
+            ax3.set_facecolor('#2C3E50')
+            ax3.tick_params(colors='white')
+            for spine in ax3.spines.values():
+                spine.set_color('white')
+            
+            # GRÁFICO 4: Scatter Open vs Issue Quantity
+            if len(self.df) > 0:
+                scatter = ax4.scatter(self.df['Issue_Q'], self.df['Opn_Q'], 
+                                     c=self.df['days_to_today'], cmap='Reds', alpha=0.6, s=30)
+                
+                ax4.set_title('Issue Qty vs Open Qty\n(Color = Días desde Issue)', 
+                             color='white', fontsize=16, fontweight='bold', pad=20)
+                ax4.set_xlabel('Issue Quantity', color='white', fontsize=14)
+                ax4.set_ylabel('Open Quantity', color='white', fontsize=14)
+                ax4.grid(True, alpha=0.3, color='white')
+                
+                # Colorbar
+                cbar = plt.colorbar(scatter, ax=ax4)
+                cbar.set_label('Días desde Issue', color='white', fontsize=12)
+                cbar.ax.tick_params(colors='white')
+            else:
+                ax4.text(0.5, 0.5, 'No hay datos para scatter', ha='center', va='center',
+                        color='white', fontsize=16, transform=ax4.transAxes)
+            
+            ax4.set_facecolor('#2C3E50')
+            ax4.tick_params(colors='white')
+            for spine in ax4.spines.values():
+                spine.set_color('white')
+            
+            # GRÁFICO 5: Top Users
+            user_counts = self.df['User_Id'].value_counts().head(10)
+            if len(user_counts) > 0:
+                y_pos = range(len(user_counts))
+                bars = ax5.barh(y_pos, user_counts.values, color='#9B59B6', alpha=0.8)
+                
+                for i, bar in enumerate(bars):
+                    width = bar.get_width()
+                    ax5.text(width + width*0.01, bar.get_y() + bar.get_height()/2,
+                            f'{int(width)}', ha='left', va='center', 
+                            color='white', fontsize=10, fontweight='bold')
+                
+                ax5.set_yticks(y_pos)
+                ax5.set_yticklabels(user_counts.index, fontsize=10)
+                ax5.set_title('Top 10 Users por Credit Memos', 
+                             color='white', fontsize=16, fontweight='bold', pad=20)
+                ax5.set_xlabel('Cantidad de CMs', color='white', fontsize=14)
+                ax5.grid(True, alpha=0.3, color='white', axis='x')
+            else:
+                ax5.text(0.5, 0.5, 'No hay datos de users', ha='center', va='center',
+                        color='white', fontsize=16, transform=ax5.transAxes)
+            
+            ax5.set_facecolor('#2C3E50')
+            ax5.tick_params(colors='white')
+            for spine in ax5.spines.values():
+                spine.set_color('white')
+            
+            # GRÁFICO 6: Timeline de Credit Memos
+            if 'Issue_Date' in self.df.columns:
+                monthly_counts = self.df.groupby(self.df['Issue_Date'].dt.to_period('M')).size()
+                
+                if len(monthly_counts) > 0:
+                    months = [str(p) for p in monthly_counts.index]
+                    bars = ax6.bar(range(len(months)), monthly_counts.values, 
+                                  color='#FF9800', alpha=0.8, edgecolor='white', linewidth=1)
+                    
+                    for bar, value in zip(bars, monthly_counts.values):
+                        height = bar.get_height()
+                        ax6.text(bar.get_x() + bar.get_width()/2., height + max(monthly_counts.values)*0.01,
+                                f'{int(value)}', ha='center', va='bottom', 
+                                color='white', fontsize=10, fontweight='bold')
+                    
+                    ax6.set_xticks(range(len(months)))
+                    ax6.set_xticklabels(months, rotation=45, ha='right')
+                    ax6.set_title('Credit Memos por Mes', 
+                                 color='white', fontsize=16, fontweight='bold', pad=20)
+                    ax6.set_ylabel('Cantidad de CMs', color='white', fontsize=14)
+                    ax6.grid(True, alpha=0.3, color='white', axis='y')
+                else:
+                    ax6.text(0.5, 0.5, 'No hay datos temporales', ha='center', va='center',
+                            color='white', fontsize=16, transform=ax6.transAxes)
+            else:
+                ax6.text(0.5, 0.5, 'No hay datos de fechas', ha='center', va='center',
+                        color='white', fontsize=16, transform=ax6.transAxes)
+            
+            ax6.set_facecolor('#2C3E50')
+            ax6.tick_params(colors='white')
+            for spine in ax6.spines.values():
+                spine.set_color('white')
+            
+            plt.tight_layout(pad=3.0)
+            
+            # Convertir a base64
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', facecolor=COLORS['surface'], 
+                       bbox_inches='tight', dpi=150)
+            buffer.seek(0)
+            chart_base64 = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            return chart_base64
+            
+        except Exception as e:
+            print(f"Error creando gráfico Credit Memos: {e}")
+            return None
+
+    def export_credit_memo_analysis(self, export_path=None):
+        """Exportar análisis completo de Credit Memos"""
+        if self.df is None or len(self.df) == 0:
+            return {"success": False, "message": "No hay datos para exportar"}
+        
+        try:
+            if export_path is None:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                export_path = f"Credit_Memo_Analysis_{timestamp}.xlsx"
+            
+            with pd.ExcelWriter(export_path, engine='openpyxl') as writer:
+                # Datos completos
+                self.df.to_excel(writer, sheet_name='Credit_Memos_Complete', index=False)
+                
+                # Por razón
+                by_reason = self.df.groupby('CM_Reason_Full').agg({
+                    'SO_Line': 'count',
+                    'Issue_Q': 'sum',
+                    'Opn_Q': 'sum'
+                }).reset_index()
+                by_reason.to_excel(writer, sheet_name='Analysis_by_Reason', index=False)
+                
+                # Por supplier
+                by_supplier = self.df.groupby('Spr_CD').agg({
+                    'SO_Line': 'count',
+                    'Issue_Q': 'sum',
+                    'Opn_Q': 'sum',
+                    'Invoice_No': 'nunique'
+                }).reset_index()
+                by_supplier.to_excel(writer, sheet_name='Analysis_by_Supplier', index=False)
+                
+                # Resumen de métricas
+                summary_data = {
+                    'Métrica': [
+                        'Total Credit Memos',
+                        'Facturas Únicas',
+                        'Suppliers Únicos',
+                        'Total Issue Qty',
+                        'Total Open Qty',
+                        'Promedio Issue Qty',
+                        'Promedio Días a Hoy',
+                        'Razón Principal'
+                    ],
+                    'Valor': [
+                        self.metrics.get('total_cms', 0),
+                        self.metrics.get('unique_invoices', 0),
+                        self.metrics.get('unique_suppliers', 0),
+                        self.metrics.get('total_issue_qty', 0),
+                        self.metrics.get('total_open_qty', 0),
+                        self.metrics.get('avg_issue_qty', 0),
+                        self.metrics.get('avg_days_to_today', 0),
+                        self.metrics.get('top_reason', 'N/A')
+                    ]
+                }
+                pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary_Metrics', index=False)
+            
+            full_path = os.path.abspath(export_path)
+            return {
+                "success": True,
+                "message": f"Exportado: {os.path.basename(export_path)}",
+                "path": full_path
+            }
+            
+        except Exception as e:
+            return {"success": False, "message": f"Error: {str(e)}"}
+
+# === FCST SPR Module ===
+class FcstSprAnalyzer:
+    def __init__(self):
+        self.fcst_data = None
+        self.expedite_data = None
+        self.financial_metrics = {}
+        self.monthly_impact = None
+
+    def load_fcst_spr_data(self, db_path=r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db"):
+        """Cargar datos de FCST SPR"""
+        try:
+            print(f"Conectando a R4Database para FCST SPR: {db_path}")
+            conn = sqlite3.connect(db_path)
+            
+            # Query para FCST SPR
+            fcst_query = """
+            SELECT Entity, Proj, AC, ConfigID, FcstNo, Description, ItemNo, Rev, UM,
+                   PlannedBy, ReqDate, QtyFcst, OpenQty, WO
+            FROM fcst
+            WHERE OpenQty > 0 AND AC LIKE 'SPR%'
+            ORDER BY AC, ReqDate
+            """
+            
+            self.fcst_data = pd.read_sql_query(fcst_query, conn)
+            print(f"✅ FCST SPR cargado: {len(self.fcst_data)} registros")
+            
+            # Procesar fechas
+            self.fcst_data['ReqDate'] = pd.to_datetime(self.fcst_data['ReqDate'], errors='coerce')
+            self.fcst_data['OpenQty'] = pd.to_numeric(self.fcst_data['OpenQty'], errors='coerce').fillna(0)
+            self.fcst_data['QtyFcst'] = pd.to_numeric(self.fcst_data['QtyFcst'], errors='coerce').fillna(0)
+            
+            conn.close()
+            self._load_expedite_for_spr()
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error cargando FCST SPR: {e}")
+            self._create_sample_fcst_spr_data()
+            return False
+
+    def _load_expedite_for_spr(self):
+        """Cargar datos de expedite para ACs SPR"""
+        try:
+            if self.fcst_data is None or len(self.fcst_data) == 0:
+                return
+            
+            # Obtener lista de ACs SPR únicos
+            spr_acs = self.fcst_data['AC'].unique().tolist()
+            
+            print(f"🔍 Buscando expedite para {len(spr_acs)} ACs SPR...")
+            
+            conn = sqlite3.connect(r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\R4Database\R4Database.db")
+            
+            # Crear query para ACs SPR
+            ac_list = "', '".join(spr_acs)
+            expedite_query = f"""
+            SELECT id, EntityGroup, Project, AC, ItemNo, Description, PlanTp, Ref, Sub, FillDoc,
+                   DemandType, Sort, ReqQty, DemandSource, Unit, Vendor, ReqDate, ShipDate, OH,
+                   MLIKCode, LT, "Std-Cost", LotSize, UOM
+            FROM expedite 
+            WHERE AC IN ('{ac_list}')
+            ORDER BY AC, ItemNo
+            """
+            
+            self.expedite_data = pd.read_sql_query(expedite_query, conn)
+            conn.close()
+            
+            print(f"✅ Expedite SPR cargado: {len(self.expedite_data)} registros")
+            
+            # Limpiar datos numéricos
+            self.expedite_data['ReqQty'] = pd.to_numeric(self.expedite_data['ReqQty'], errors='coerce').fillna(0)
+            self.expedite_data['Std-Cost'] = pd.to_numeric(self.expedite_data['Std-Cost'], errors='coerce').fillna(0)
+            self.expedite_data['ReqDate'] = pd.to_datetime(self.expedite_data['ReqDate'], errors='coerce')
+            
+            # Filtrar ASYFNL y calcular impacto financiero
+            self.expedite_financial = self.expedite_data[self.expedite_data['PlanTp'] != 'ASYFNL'].copy()
+            self.expedite_financial['Financial_Impact'] = self.expedite_financial['ReqQty'] * self.expedite_financial['Std-Cost']
+            
+            self._calculate_financial_metrics()
+            
+        except Exception as e:
+            print(f"❌ Error cargando expedite SPR: {e}")
+            self.expedite_data = pd.DataFrame()
+
+    def _calculate_financial_metrics(self):
+        """Calcular métricas financieras y por mes"""
+        if self.expedite_financial is None or len(self.expedite_financial) == 0:
+            return
+        
+        # Métricas generales
+        total_impact = self.expedite_financial['Financial_Impact'].sum()
+        avg_impact = self.expedite_financial['Financial_Impact'].mean()
+        total_items = len(self.expedite_financial)
+        total_acs = self.expedite_financial['AC'].nunique()
+        
+        self.financial_metrics = {
+            'total_financial_impact': float(total_impact),
+            'avg_financial_impact': float(avg_impact),
+            'total_items': total_items,
+            'total_acs': total_acs,
+            'excluded_asyfnl': len(self.expedite_data) - len(self.expedite_financial)
+        }
+        
+        # Análisis mensual
+        self.expedite_financial['Year_Month'] = self.expedite_financial['ReqDate'].dt.to_period('M')
+        self.monthly_impact = self.expedite_financial.groupby('Year_Month').agg({
+            'Financial_Impact': 'sum',
+            'ItemNo': 'count',
+            'AC': 'nunique'
+        }).reset_index()
+        
+        self.monthly_impact['Year_Month_Str'] = self.monthly_impact['Year_Month'].astype(str)
+        
+        print(f"💰 Métricas SPR calculadas:")
+        print(f"   Total impacto: ${total_impact:,.2f}")
+        print(f"   Items: {total_items:,}")
+        print(f"   ACs: {total_acs:,}")
+        print(f"   Meses con data: {len(self.monthly_impact)}")
+
+    def _create_sample_fcst_spr_data(self):
+        """Crear datos de ejemplo para FCST SPR"""
+        np.random.seed(42)
+        n_records = 50
+        
+        # Datos simulados
+        base_date = datetime(2025, 8, 1)
+        spr_acs = [f"SPR{100+i:03d}" for i in range(10)]
+        
+        fcst_data = []
+        for i in range(n_records):
+            record = {
+                'Entity': 'EZ4120',
+                'Proj': f'PROJ{i%3}',
+                'AC': np.random.choice(spr_acs),
+                'ConfigID': f'CFG{i:03d}',
+                'FcstNo': f'FCST-SPR-{i:04d}',
+                'Description': f'SPR Item {i}',
+                'ItemNo': f'SPR-ITEM-{i:03d}',
+                'Rev': 'A',
+                'UM': 'EA',
+                'PlannedBy': f'PLANNER{i%3}',
+                'ReqDate': base_date + timedelta(days=np.random.randint(0, 180)),
+                'QtyFcst': np.random.randint(1, 100),
+                'OpenQty': np.random.randint(1, 50),
+                'WO': f'WO-SPR-{i:04d}'
+            }
+            fcst_data.append(record)
+        
+        self.fcst_data = pd.DataFrame(fcst_data)
+        self.fcst_data['ReqDate'] = pd.to_datetime(self.fcst_data['ReqDate'])
+        
+        # Crear datos de expedite simulados
+        expedite_data = []
+        for i in range(30):
+            ac = np.random.choice(spr_acs)
+            record = {
+                'AC': ac,
+                'ItemNo': f'SPR-EXP-{i:03d}',
+                'Description': f'SPR Expedite Item {i}',
+                'PlanTp': np.random.choice(['BUY', 'MAKE', 'ASYFNL'], p=[0.6, 0.3, 0.1]),
+                'ReqQty': np.random.randint(1, 50),
+                'Std-Cost': np.random.uniform(10, 500),
+                'ReqDate': base_date + timedelta(days=np.random.randint(0, 120))
+            }
+            expedite_data.append(record)
+        
+        self.expedite_data = pd.DataFrame(expedite_data)
+        self.expedite_data['ReqDate'] = pd.to_datetime(self.expedite_data['ReqDate'])
+        
+        # Filtrar y calcular
+        self.expedite_financial = self.expedite_data[self.expedite_data['PlanTp'] != 'ASYFNL'].copy()
+        self.expedite_financial['Financial_Impact'] = self.expedite_financial['ReqQty'] * self.expedite_financial['Std-Cost']
+        
+        self._calculate_financial_metrics()
+        print("🧪 Datos de ejemplo FCST SPR creados")
+
+    def create_monthly_financial_chart(self):
+        """Crear gráfico lineal de impacto financiero por mes"""
+        if self.monthly_impact is None or len(self.monthly_impact) == 0:
+            return None
+        
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            
+            plt.style.use('dark_background')
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 12))
+            fig.patch.set_facecolor(COLORS['surface'])
+            
+            # GRÁFICO 1: Línea de impacto financiero por mes
+            months = self.monthly_impact['Year_Month_Str']
+            impact = self.monthly_impact['Financial_Impact']
+            
+            # Línea principal
+            ax1.plot(months, impact, marker='o', linewidth=3, markersize=8, 
+                    color='#00FF88', markerfacecolor='#FF6B6B', markeredgecolor='white', 
+                    markeredgewidth=2, alpha=0.9)
+            
+            # Área bajo la curva
+            ax1.fill_between(months, impact, alpha=0.3, color='#00FF88')
+            
+            # Agregar valores en cada punto
+            for i, (month, value) in enumerate(zip(months, impact)):
+                ax1.annotate(f'${value:,.0f}', 
+                           (i, value), 
+                           textcoords="offset points", 
+                           xytext=(0,10), 
+                           ha='center',
+                           fontsize=10,
+                           color='white',
+                           fontweight='bold',
+                           bbox=dict(boxstyle='round,pad=0.3', facecolor='black', alpha=0.7))
+            
+            ax1.set_title('Impacto Financiero Mensual - FCST SPR\n(Expedite sin ASYFNL)', 
+                         color='white', fontsize=18, fontweight='bold', pad=20)
+            ax1.set_xlabel('Mes (ReqDate)', color='white', fontsize=14)
+            ax1.set_ylabel('Impacto Financiero ($)', color='white', fontsize=14)
+            ax1.grid(True, alpha=0.3, color='white')
+            ax1.set_facecolor('#2C3E50')
+            
+            # Rotar etiquetas del eje X
+            plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha='right')
+            
+            # Formatear eje Y con separadores de miles
+            ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:,.0f}'))
+            
+            ax1.tick_params(colors='white')
+            for spine in ax1.spines.values():
+                spine.set_color('white')
+            
+            # GRÁFICO 2: Barras de cantidad de items por mes
+            items_count = self.monthly_impact['ItemNo']
+            
+            bars = ax2.bar(months, items_count, color='#45B7D1', alpha=0.8, 
+                          edgecolor='white', linewidth=1)
+            
+            # Agregar valores en las barras
+            for bar, value in zip(bars, items_count):
+                height = bar.get_height()
+                ax2.text(bar.get_x() + bar.get_width()/2., height + max(items_count)*0.01,
+                        f'{int(value)}', ha='center', va='bottom', 
+                        color='white', fontsize=11, fontweight='bold')
+            
+            ax2.set_title('Cantidad de Items por Mes - FCST SPR', 
+                         color='white', fontsize=16, fontweight='bold', pad=20)
+            ax2.set_xlabel('Mes (ReqDate)', color='white', fontsize=14)
+            ax2.set_ylabel('Cantidad de Items', color='white', fontsize=14)
+            ax2.grid(True, alpha=0.3, color='white', axis='y')
+            ax2.set_facecolor('#2C3E50')
+            
+            plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
+            
+            ax2.tick_params(colors='white')
+            for spine in ax2.spines.values():
+                spine.set_color('white')
+            
+            plt.tight_layout()
+            
+            # Convertir a base64
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', facecolor=COLORS['surface'], 
+                       bbox_inches='tight', dpi=150)
+            buffer.seek(0)
+            chart_base64 = base64.b64encode(buffer.getvalue()).decode()
+            plt.close()
+            
+            return chart_base64
+            
+        except Exception as e:
+            print(f"Error creando gráfico FCST SPR: {e}")
+            return None
+
+    def export_fcst_spr_analysis(self, export_path=None):
+        """Exportar análisis completo de FCST SPR"""
+        if self.fcst_data is None or len(self.fcst_data) == 0:
+            return {"success": False, "message": "No hay datos de FCST SPR para exportar"}
+        
+        try:
+            if export_path is None:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                export_path = f"FCST_SPR_Analysis_{timestamp}.xlsx"
+            
+            with pd.ExcelWriter(export_path, engine='openpyxl') as writer:
+                # FCST SPR completo
+                self.fcst_data.to_excel(writer, sheet_name='FCST_SPR_Complete', index=False)
+                
+                # Expedite completo
+                if self.expedite_data is not None and len(self.expedite_data) > 0:
+                    self.expedite_data.to_excel(writer, sheet_name='Expedite_SPR_Complete', index=False)
+                    
+                    # Expedite financiero (sin ASYFNL)
+                    if hasattr(self, 'expedite_financial') and len(self.expedite_financial) > 0:
+                        self.expedite_financial.to_excel(writer, sheet_name='Expedite_SPR_Financial', index=False)
+                
+                # Resumen por AC
+                if self.expedite_data is not None and len(self.expedite_data) > 0:
+                    ac_summary = self.expedite_financial.groupby('AC').agg({
+                        'ItemNo': 'count',
+                        'ReqQty': 'sum',
+                        'Std-Cost': 'mean',
+                        'Financial_Impact': 'sum'
+                    }).rename(columns={
+                        'ItemNo': 'Items_Count',
+                        'ReqQty': 'Total_ReqQty',
+                        'Std-Cost': 'Avg_StdCost',
+                        'Financial_Impact': 'Total_Financial_Impact'
+                    }).reset_index()
+                    
+                    ac_summary['Total_Financial_Impact'] = ac_summary['Total_Financial_Impact'].round(2)
+                    ac_summary['Avg_StdCost'] = ac_summary['Avg_StdCost'].round(2)
+                    
+                    ac_summary.to_excel(writer, sheet_name='Financial_Summary_by_AC', index=False)
+                
+                # Análisis mensual
+                if self.monthly_impact is not None and len(self.monthly_impact) > 0:
+                    monthly_export = self.monthly_impact.copy()
+                    monthly_export['Financial_Impact'] = monthly_export['Financial_Impact'].round(2)
+                    monthly_export.to_excel(writer, sheet_name='Monthly_Financial_Impact', index=False)
+                
+                # Resumen de métricas
+                summary_data = {
+                    'Métrica': [
+                        'Total FCST SPR Records',
+                        'Total Expedite SPR Records',
+                        'Financial Items (sin ASYFNL)',
+                        'ACs Únicos con Expedite',
+                        'Impacto Financiero Total',
+                        'Promedio por Item',
+                        'Items Excluidos (ASYFNL)',
+                        'Meses con Data'
+                    ],
+                    'Valor': [
+                        len(self.fcst_data),
+                        len(self.expedite_data) if self.expedite_data is not None else 0,
+                        self.financial_metrics.get('total_items', 0),
+                        self.financial_metrics.get('total_acs', 0),
+                        f"${self.financial_metrics.get('total_financial_impact', 0):,.2f}",
+                        f"${self.financial_metrics.get('avg_financial_impact', 0):,.2f}",
+                        self.financial_metrics.get('excluded_asyfnl', 0),
+                        len(self.monthly_impact) if self.monthly_impact is not None else 0
+                    ]
+                }
+                pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary_Metrics', index=False)
+            
+            full_path = os.path.abspath(export_path)
+            return {
+                "success": True,
+                "message": f"Exportado: {os.path.basename(export_path)}",
+                "path": full_path,
+                "total_impact": self.financial_metrics.get('total_financial_impact', 0)
+            }
+            
+        except Exception as e:
+            print(f"❌ Error exportando FCST SPR: {e}")
+            return {"success": False, "message": f"Error: {str(e)}"}
+
+
 
 def create_top_items_table(analyzer):
     """Crear tabla de top items expirados"""
@@ -2753,8 +4161,11 @@ def main(page: ft.Page):
         analyzer.load_data_from_db()
         analyzer.load_fcst_alignment_data()
         analyzer.load_sales_order_alignment_data()
-        analyzer.load_wo_materials_analysis()  # Nueva función WO-Materials
-        analyzer.load_obsolete_expired_neteable_analysis()  # Nueva función OBS/EXP
+        analyzer.load_wo_materials_analysis()
+        analyzer.load_obsolete_expired_neteable_analysis()
+        analyzer.credit_memo_analyzer.load_credit_memo_data()
+        analyzer.psu_cleanup_analyzer.load_psu_cleanup_data()
+        analyzer.fcst_spr_analyzer.load_fcst_spr_data()  # AGREGAR ESTA LÍNEA
         update_dashboard()
 
     def update_dashboard():
@@ -3711,7 +5122,6 @@ def main(page: ft.Page):
                 padding=ft.padding.all(20)
             )
 
-
         def create_status_cards(metrics):
             """Crear tarjetas dinámicas por WO_Status"""
             status_cards = []
@@ -3776,8 +5186,606 @@ def main(page: ft.Page):
             
             return ft.Column(rows, spacing=15)
 
+        def create_credit_memo_analysis(analyzer, page):
+            """Crear análisis de Credit Memos"""
+            # Verificar que tenemos datos
+            cm_analyzer = analyzer.credit_memo_analyzer
+            if not hasattr(cm_analyzer, 'df') or cm_analyzer.df is None:
+                cm_analyzer.load_credit_memo_data()
+            
+            # Métricas principales
+            metrics = cm_analyzer.metrics
+            
+            # Tarjetas de métricas principales
+            main_cards = ft.Row([
+                create_metric_card(
+                    "Total Credit Memos", 
+                    f"{metrics.get('total_cms', 0):,}",
+                    "Sales Orders afectadas",
+                    COLORS['accent']
+                ),
+                create_metric_card(
+                    "Total Issue Qty", 
+                    f"{metrics.get('total_issue_qty', 0):,}",
+                    "Cantidad total emitida",
+                    COLORS['error']
+                ),
+                create_metric_card(
+                    "Suppliers Únicos", 
+                    f"{metrics.get('unique_suppliers', 0):,}",
+                    "Proveedores afectados",
+                    COLORS['success']
+                ),
+                create_metric_card(
+                    "Promedio Issue Qty", 
+                    f"{metrics.get('avg_issue_qty', 0)}",
+                    "Por Credit Memo",
+                    COLORS['warning']
+                )
+            ], wrap=True, spacing=15)
 
-        # Crear pestañas
+            # Tarjetas adicionales
+            additional_cards = ft.Row([
+                create_metric_card(
+                    "Facturas Únicas", 
+                    f"{metrics.get('unique_invoices', 0):,}",
+                    "Invoices con CMs",
+                    COLORS['accent']
+                ),
+                create_metric_card(
+                    "Razón Principal", 
+                    metrics.get('top_reason', 'N/A')[:15],
+                    "Más frecuente",
+                    COLORS['success']
+                ),
+                create_metric_card(
+                    "Promedio Días", 
+                    f"{metrics.get('avg_days_to_today', 0)}",
+                    "Desde Issue Date",
+                    COLORS['warning']
+                ),
+                create_metric_card(
+                    "Total Open Qty", 
+                    f"{metrics.get('total_open_qty', 0):,}",
+                    "Cantidad aún abierta",
+                    COLORS['error']
+                )
+            ], wrap=True, spacing=15)
+
+            # Gráficos
+            chart_base64 = cm_analyzer.create_credit_memo_chart()
+            chart_container = ft.Container(
+                content=ft.Column([
+                    ft.Text("📊 ANÁLISIS COMPLETO: CREDIT MEMOS", 
+                        size=20, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                    ft.Text("Sales Orders con Open Qty > 0 y Credit Memos asociados", 
+                        size=12, color=COLORS['text_secondary']),
+                    ft.Image(
+                        src_base64=chart_base64,
+                        width=page.width - 80,
+                        height=800,
+                        fit=ft.ImageFit.CONTAIN
+                    ) if chart_base64 else ft.Text("Error generando gráfico", color=COLORS['error'])
+                ]),
+                padding=ft.padding.all(20),
+                bgcolor=COLORS['primary'],
+                border_radius=12
+            )
+
+            # Función de exportación
+            def export_cm_analysis():
+                try:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    export_path = f"Credit_Memo_Analysis_{timestamp}.xlsx"
+                    
+                    result = cm_analyzer.export_credit_memo_analysis(export_path)
+                    
+                    if result["success"]:
+                        # Abrir archivo
+                        full_path = result['path']
+                        import subprocess
+                        import platform
+                        if platform.system() == 'Windows':
+                            subprocess.call(('start', full_path), shell=True)
+                        
+                        return f"✅ Exportado: {os.path.basename(export_path)}"
+                    else:
+                        return f"❌ Error: {result['message']}"
+                        
+                except Exception as e:
+                    return f"❌ Error: {str(e)}"
+
+            # Tarjeta de exportación
+            export_cm_card = ft.Card(
+                content=ft.Container(
+                    padding=ft.padding.all(20),
+                    bgcolor=COLORS['primary'],
+                    border_radius=12,
+                    content=ft.Column([
+                        ft.Row([
+                            ft.Text("📤 Exportar Análisis Credit Memos", 
+                                    size=18, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD),
+                            ft.ElevatedButton(
+                                "📊 Exportar CMs",
+                                on_click=lambda _: print(export_cm_analysis()),
+                                bgcolor=COLORS['accent'],
+                                color=COLORS['text_primary']
+                            )
+                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                        ft.Text("Se exportarán: Completos, Por Razón, Por Supplier, Métricas", 
+                                size=12, color=COLORS['text_secondary'])
+                    ])
+                ),
+                elevation=8
+            )
+
+            # Tarjeta de información
+            info_card = ft.Card(
+                content=ft.Container(
+                    padding=ft.padding.all(20),
+                    bgcolor=COLORS['secondary'],
+                    border_radius=12,
+                    content=ft.Column([
+                        ft.Text("ℹ️ Información del Análisis Credit Memos", 
+                                size=18, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD),
+                        ft.Divider(color=COLORS['primary']),
+                        ft.Column([
+                            ft.Text("🔍 Filtros Aplicados:", size=14, color=COLORS['accent'], weight=ft.FontWeight.BOLD),
+                            ft.Text("• Sales Orders con Open Qty > 0", size=12, color=COLORS['text_secondary']),
+                            ft.Text("• Credit Memos con Invoice No válido", size=12, color=COLORS['text_secondary']),
+                            ft.Text("• Inner Join por SO_Line (SO_No + Line)", size=12, color=COLORS['text_secondary']),
+                            ft.Text("", size=4),
+                            ft.Text("📊 Definiciones:", size=14, color=COLORS['success'], weight=ft.FontWeight.BOLD),
+
+                            ft.Text("• Issue Qty: Cantidad emitida en Credit Memo", size=12, color=COLORS['text_secondary']),
+                            ft.Text("• Open Qty: Cantidad aún abierta en Sales Order", size=12, color=COLORS['text_secondary']),
+                            ft.Text("• Days: Días desde Issue Date hasta hoy", size=12, color=COLORS['text_secondary']),
+                            ft.Text("• Solo SOs que aún tienen cantidad pendiente", size=12, color=COLORS['text_secondary']),
+                        ], spacing=3)
+                    ])
+                ),
+                elevation=8
+            )
+
+            # Tabla de datos principales
+            data_table = create_credit_memo_data_table(cm_analyzer)
+
+            return ft.Container(
+                content=ft.Column([
+                    ft.Text("💳 ANÁLISIS: CREDIT MEMOS", 
+                        size=24, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                    ft.Text("Sales Orders con Open Qty > 0 que tienen Credit Memos asociados", 
+                        size=14, color=COLORS['text_secondary']),
+                    main_cards,
+                    additional_cards,
+                    ft.Divider(color=COLORS['secondary']),
+                    info_card,
+                    export_cm_card,
+                    data_table,
+                    chart_container
+                ], spacing=20),
+                padding=ft.padding.all(20)
+            )
+
+        def create_psu_cleanup_analysis(analyzer, page):
+            """Crear análisis de Limpieza PSU"""
+            # Verificar que tenemos datos
+            psu_analyzer = analyzer.psu_cleanup_analyzer
+            if not hasattr(psu_analyzer, 'df') or psu_analyzer.df is None:
+                psu_analyzer.load_psu_cleanup_data()
+            
+            # Métricas principales
+            metrics = psu_analyzer.metrics
+            
+            # Tarjetas de métricas principales
+            main_cards = ft.Row([
+                create_metric_card(
+                    "Total Avienes", 
+                    f"{metrics.get('total_avienes', 0):,}",
+                    "EZ4120 sin avienes X",
+                    COLORS['accent']
+                ),
+                create_metric_card(
+                    "Bien Cargados", 
+                    f"{metrics.get('bien_cargados_pct', 0)}%",
+                    f"{metrics.get('bien_cargados', 0):,} avienes (4 facturables)",
+                    COLORS['success']
+                ),
+                create_metric_card(
+                    "Necesitan Limpieza", 
+                    f"{metrics.get('necesitan_limpieza_pct', 0)}%",
+                    f"{metrics.get('necesitan_limpieza', 0):,} avienes (2 facturables)",
+                    COLORS['error']
+                ),
+                create_metric_card(
+                    "Score Eficiencia", 
+                    f"{metrics.get('efficiency_score', 0)}%",
+                    "% Avienes bien cargados",
+                    COLORS['warning']
+                )
+            ], wrap=True, spacing=15)
+
+            # Agregar después de main_cards en create_psu_cleanup_analysis:
+
+            # Cargar datos de expedite
+            # Cargar datos de expedite
+            psu_analyzer.load_expedite_data_for_dirty_planes()
+
+            # Función helper para valores seguros
+            def get_safe_numeric_value(data, column, operation='sum'):
+                """Obtener valor numérico de manera segura"""
+                try:
+                    if hasattr(psu_analyzer, 'expedite_data') and len(psu_analyzer.expedite_data) > 0:
+                        series = pd.to_numeric(psu_analyzer.expedite_data[column], errors='coerce').fillna(0)
+                        if operation == 'sum':
+                            return int(series.sum())
+                        elif operation == 'count':
+                            return int(len(series))
+                        elif operation == 'nunique':
+                            return int(psu_analyzer.expedite_data['AC'].nunique())
+                    return 0
+                except:
+                    return 0
+
+            # Tarjeta de información de expedite
+            expedite_info_card = ft.Card(
+                content=ft.Container(
+                    padding=ft.padding.all(20),
+                    bgcolor=COLORS['secondary'],
+                    border_radius=12,
+                    content=ft.Column([
+                        ft.Text("📦 MATERIALES EN EXPEDITE (Aviones Sucios)", 
+                                size=18, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD),
+                        ft.Divider(color=COLORS['primary']),
+                        ft.Row([
+                            ft.Column([
+                                ft.Text("Items en Expedite", size=14, color=COLORS['accent']),
+                                ft.Text(f"{len(psu_analyzer.expedite_data) if hasattr(psu_analyzer, 'expedite_data') else 0:,}", 
+                                        size=24, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD)
+                            ], expand=1),
+                            ft.Column([
+                                ft.Text("Aviones con Expedite", size=14, color=COLORS['success']),
+                                ft.Text(f"{get_safe_numeric_value(None, 'AC', 'nunique'):,}", 
+                                        size=24, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD)
+                            ], expand=1),
+                            ft.Column([
+                                ft.Text("Total ReqQty", size=14, color=COLORS['warning']),
+                                ft.Text(f"{get_safe_numeric_value(None, 'ReqQty', 'sum'):,}", 
+                                        size=24, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD)
+                            ], expand=1)
+                        ])
+                    ])
+                ),
+                elevation=8
+            )
+
+            # NUEVA: Tarjeta de impacto financiero
+            financial_impact_card = ft.Card(
+                content=ft.Container(
+                    padding=ft.padding.all(20),
+                    bgcolor=COLORS['primary'],
+                    border_radius=12,
+                    content=ft.Column([
+                        ft.Text("💰 IMPACTO FINANCIERO (Excluye ASYFNL)", 
+                                size=18, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD),
+                        ft.Divider(color=COLORS['secondary']),
+                        ft.Row([
+                            ft.Column([
+                                ft.Text("Impacto Total", size=14, color=COLORS['error']),
+                                ft.Text(f"${psu_analyzer.financial_metrics.get('total_financial_impact', 0):,.2f}" if hasattr(psu_analyzer, 'financial_metrics') else "$0.00", 
+                                        size=28, color=COLORS['error'], weight=ft.FontWeight.BOLD)
+                            ], expand=2),
+                            ft.Column([
+                                ft.Text("Items Financieros", size=14, color=COLORS['accent']),
+                                ft.Text(f"{psu_analyzer.financial_metrics.get('financial_items_count', 0):,}" if hasattr(psu_analyzer, 'financial_metrics') else "0", 
+                                        size=20, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD)
+                            ], expand=1),
+                            ft.Column([
+                                ft.Text("Excluidos ASYFNL", size=14, color=COLORS['text_secondary']),
+                                ft.Text(f"{psu_analyzer.financial_metrics.get('excluded_asyfnl_count', 0):,}" if hasattr(psu_analyzer, 'financial_metrics') else "0", 
+                                        size=20, color=COLORS['text_secondary'], weight=ft.FontWeight.BOLD)
+                            ], expand=1)
+                        ]),
+                        ft.Divider(color=COLORS['secondary']),
+                        ft.Text(f"Promedio por item: ${psu_analyzer.financial_metrics.get('avg_financial_impact', 0):,.2f}" if hasattr(psu_analyzer, 'financial_metrics') else "Promedio por item: $0.00", 
+                                size=12, color=COLORS['text_secondary'])
+                    ])
+                ),
+                elevation=8
+            )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            # Gráficos
+            chart_base64 = psu_analyzer.create_psu_cleanup_chart()
+            chart_container = ft.Container(
+                content=ft.Column([
+                    ft.Text("📊 ANÁLISIS COMPLETO: LIMPIEZA DE PSU (FACTURABLES)", 
+                        size=20, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                    ft.Text("Entity EZ4120 - Avienes con 4 facturables (ideal) vs 2 facturables (necesita limpieza)", 
+                        size=12, color=COLORS['text_secondary']),
+                    ft.Image(
+                        src_base64=chart_base64,
+                        width=page.width - 80,
+                        height=800,
+                        fit=ft.ImageFit.CONTAIN
+                    ) if chart_base64 else ft.Text("Error generando gráfico", color=COLORS['error'])
+                ]),
+                padding=ft.padding.all(20),
+                bgcolor=COLORS['primary'],
+                border_radius=12
+            )
+
+            # Función de exportación
+            def export_psu_analysis():
+                try:
+                    result = psu_analyzer.export_psu_cleanup_analysis()
+                    if result["success"]:
+                        import subprocess
+                        import platform
+                        if platform.system() == 'Windows':
+                            subprocess.call(('start', result['path']), shell=True)
+                        return f"✅ Exportado: {result['message']} - Expedite: {result.get('expedite_items', 0)} items"
+                    else:
+                        return f"❌ Error: {result['message']}"
+                except Exception as e:
+                    return f"❌ Error: {str(e)}"
+
+            # Tarjeta de exportación
+            export_psu_card = ft.Card(
+                content=ft.Container(
+                    padding=ft.padding.all(20),
+                    bgcolor=COLORS['primary'],
+                    border_radius=12,
+                    content=ft.Column([
+                        ft.Row([
+                            ft.Text("📤 Exportar Análisis PSU", 
+                                    size=18, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD),
+                            ft.ElevatedButton(
+                                "📊 Exportar PSU",
+                                on_click=lambda _: print(export_psu_analysis()),
+                                bgcolor=COLORS['accent'],
+                                color=COLORS['text_primary']
+                            )
+                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                        ft.Text("Se exportarán: Resumen AC, Detalles, Limpieza, Bien Cargados, Métricas", 
+                                size=12, color=COLORS['text_secondary'])
+                    ])
+                ),
+                elevation=8
+            )
+
+            return ft.Container(
+                content=ft.Column([
+                    ft.Text("✈️ ANÁLISIS: LIMPIEZA DE PSU (FACTURABLES)", 
+                        size=24, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                    ft.Text("Identificación de avienes EZ4120 que necesitan limpieza manual de facturables", 
+                        size=14, color=COLORS['text_secondary']),
+                    main_cards,
+                    expedite_info_card,
+                    financial_impact_card,  # NUEVA TARJETA
+                    export_psu_card,
+                    chart_container
+                ], spacing=20),
+                padding=ft.padding.all(20)
+            )
+        
+        def create_credit_memo_data_table(cm_analyzer):
+            """Crear tabla de datos de Credit Memos"""
+            if cm_analyzer.df is None or len(cm_analyzer.df) == 0:
+                return ft.Container(
+                    content=ft.Text("No hay datos de Credit Memos", color=COLORS['text_secondary']),
+                    padding=ft.padding.all(20)
+                )
+            
+            # Tomar los primeros 20 registros para la tabla
+            sample_data = cm_analyzer.df.head(20)
+            
+            rows = []
+            for _, row in sample_data.iterrows():
+                # Colores condicionales
+                opn_q_color = COLORS['success'] if row['Opn_Q'] > 0 else COLORS['error']
+                days_color = COLORS['success'] if row['days_to_today'] < 30 else COLORS['warning'] if row['days_to_today'] < 90 else COLORS['error']
+                
+                table_row = ft.DataRow(
+                    cells=[
+                        ft.DataCell(ft.Text(str(row['SO_Line']), size=10, color=COLORS['accent'])),
+                        ft.DataCell(ft.Text(str(row['Invoice_No']), size=10, color=COLORS['text_primary'])),
+                        ft.DataCell(ft.Text(str(row['CM_Reason'])[:6], size=10, color=COLORS['warning'])),
+                        ft.DataCell(ft.Text(str(row['Spr_CD']), size=10, color=COLORS['success'])),
+                        ft.DataCell(ft.Text(str(row['User_Id']), size=10, color=COLORS['text_secondary'])),
+                        ft.DataCell(ft.Text(f"{int(row['Issue_Q'])}", size=10, color=COLORS['error'])),
+                        ft.DataCell(ft.Text(f"{int(row['Opn_Q'])}", size=10, color=opn_q_color)),
+                        ft.DataCell(ft.Text(f"{int(row['days_to_today'])}d", size=10, color=days_color))
+                    ]
+                )
+                rows.append(table_row)
+            
+            table = ft.DataTable(
+                columns=[
+                    ft.DataColumn(ft.Text("SO Line", color=COLORS['text_primary'], weight=ft.FontWeight.BOLD, size=11)),
+                    ft.DataColumn(ft.Text("Invoice", color=COLORS['text_primary'], weight=ft.FontWeight.BOLD, size=11)),
+                    ft.DataColumn(ft.Text("Reason", color=COLORS['text_primary'], weight=ft.FontWeight.BOLD, size=11)),
+                    ft.DataColumn(ft.Text("Supplier", color=COLORS['text_primary'], weight=ft.FontWeight.BOLD, size=11)),
+                    ft.DataColumn(ft.Text("User", color=COLORS['text_primary'], weight=ft.FontWeight.BOLD, size=11)),
+                    ft.DataColumn(ft.Text("Issue Q", color=COLORS['text_primary'], weight=ft.FontWeight.BOLD, size=11)),
+                    ft.DataColumn(ft.Text("Open Q", color=COLORS['text_primary'], weight=ft.FontWeight.BOLD, size=11)),
+                    ft.DataColumn(ft.Text("Days", color=COLORS['text_primary'], weight=ft.FontWeight.BOLD, size=11))
+                ],
+                rows=rows,
+                heading_row_color=COLORS['secondary'],
+                data_row_color=COLORS['primary'],
+                border_radius=8
+            )
+            
+            return ft.Container(
+                content=ft.Column([
+                    ft.Text("📋 MUESTRA DE DATOS (Primeros 20 registros)", 
+                        size=18, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                    ft.Container(
+                        content=ft.Column([table], scroll=ft.ScrollMode.AUTO),
+                        height=300,
+                        padding=ft.padding.all(10),
+                        bgcolor=COLORS['primary'],
+                        border_radius=8
+                    )
+                ]),
+                padding=ft.padding.all(20),
+                bgcolor=COLORS['primary'],
+                border_radius=12
+            )
+
+        def create_fcst_spr_analysis(analyzer, page):
+            """Crear análisis de FCST SPR"""
+            # Verificar que tenemos datos
+            spr_analyzer = analyzer.fcst_spr_analyzer
+            if not hasattr(spr_analyzer, 'fcst_data') or spr_analyzer.fcst_data is None:
+                spr_analyzer.load_fcst_spr_data()
+            
+            # Métricas principales
+            metrics = spr_analyzer.financial_metrics
+            
+            # Tarjetas de métricas principales
+            main_cards = ft.Row([
+                create_metric_card(
+                    "FCST SPR Records", 
+                    f"{len(spr_analyzer.fcst_data) if spr_analyzer.fcst_data is not None else 0:,}",
+                    "OpenQty > 0 con AC LIKE 'SPR%'",
+                    COLORS['accent']
+                ),
+                create_metric_card(
+                    "Impacto Financiero", 
+                    f"${metrics.get('total_financial_impact', 0):,.2f}",
+                    "Expedite sin ASYFNL",
+                    COLORS['error']
+                ),
+                create_metric_card(
+                    "Items Financieros", 
+                    f"{metrics.get('total_items', 0):,}",
+                    f"En {metrics.get('total_acs', 0):,} ACs SPR",
+                    COLORS['success']
+                ),
+                create_metric_card(
+                    "Promedio por Item", 
+                    f"${metrics.get('avg_financial_impact', 0):,.2f}",
+                    "Costo promedio",
+                    COLORS['warning']
+                )
+            ], wrap=True, spacing=15)
+
+            # Gráfico mensual
+            chart_base64 = spr_analyzer.create_monthly_financial_chart()
+            chart_container = ft.Container(
+                content=ft.Column([
+                    ft.Text("📊 ANÁLISIS MENSUAL: IMPACTO FINANCIERO FCST SPR", 
+                        size=20, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                    ft.Text("Análisis temporal basado en ReqDate de expedite (excluyendo ASYFNL)", 
+                        size=12, color=COLORS['text_secondary']),
+                    ft.Image(
+                        src_base64=chart_base64,
+                        width=page.width - 80,
+                        height=700,
+                        fit=ft.ImageFit.CONTAIN
+                    ) if chart_base64 else ft.Text("Error generando gráfico", color=COLORS['error'])
+                ]),
+                padding=ft.padding.all(20),
+                bgcolor=COLORS['primary'],
+                border_radius=12
+            )
+
+            # Función de exportación
+            def export_spr_analysis():
+                try:
+                    result = spr_analyzer.export_fcst_spr_analysis()
+                    if result["success"]:
+                        import subprocess
+                        import platform
+                        if platform.system() == 'Windows':
+                            subprocess.call(('start', result['path']), shell=True)
+                        return f"✅ Exportado: {result['message']} - Impacto: ${result.get('total_impact', 0):,.2f}"
+                    else:
+                        return f"❌ Error: {result['message']}"
+                except Exception as e:
+                    return f"❌ Error: {str(e)}"
+
+            # Tarjeta de exportación
+            export_spr_card = ft.Card(
+                content=ft.Container(
+                    padding=ft.padding.all(20),
+                    bgcolor=COLORS['primary'],
+                    border_radius=12,
+                    content=ft.Column([
+                        ft.Row([
+                            ft.Text("📤 Exportar Análisis FCST SPR", 
+                                    size=18, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD),
+                            ft.ElevatedButton(
+                                "📊 Exportar SPR",
+                                on_click=lambda _: print(export_spr_analysis()),
+                                bgcolor=COLORS['accent'],
+                                color=COLORS['text_primary']
+                            )
+                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                        ft.Text("Se exportarán: FCST SPR, Expedite SPR, Análisis Financiero, Resumen Mensual", 
+                                size=12, color=COLORS['text_secondary'])
+                    ])
+                ),
+                elevation=8
+            )
+
+            # Tarjeta de información
+            info_card = ft.Card(
+                content=ft.Container(
+                    padding=ft.padding.all(20),
+                    bgcolor=COLORS['secondary'],
+                    border_radius=12,
+                    content=ft.Column([
+                        ft.Text("ℹ️ Información del Análisis FCST SPR", 
+                                size=18, color=COLORS['text_primary'], weight=ft.FontWeight.BOLD),
+                        ft.Divider(color=COLORS['primary']),
+                        ft.Column([
+                            ft.Text("🔍 Datos Incluidos:", size=14, color=COLORS['accent'], weight=ft.FontWeight.BOLD),
+                            ft.Text("• FCST con OpenQty > 0 y AC LIKE 'SPR%'", size=12, color=COLORS['text_secondary']),
+                            ft.Text("• Expedite correspondiente a los ACs SPR", size=12, color=COLORS['text_secondary']),
+                            ft.Text("• Excluye items con PlanTp = 'ASYFNL'", size=12, color=COLORS['text_secondary']),
+                            ft.Text("", size=4),
+                            ft.Text("📊 Cálculos:", size=14, color=COLORS['success'], weight=ft.FontWeight.BOLD),
+                            ft.Text("• Impacto Financiero = ReqQty × Std-Cost", size=12, color=COLORS['text_secondary']),
+                            ft.Text("• Análisis mensual basado en ReqDate", size=12, color=COLORS['text_secondary']),
+                            ft.Text("• Gráfico lineal temporal de impacto financiero", size=12, color=COLORS['text_secondary']),
+                        ], spacing=3)
+                    ])
+                ),
+                elevation=8
+            )
+
+            return ft.Container(
+                content=ft.Column([
+                    ft.Text("🚀 ANÁLISIS: FCST SPR", 
+                        size=24, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
+                    ft.Text("Análisis financiero temporal de FCST con AC tipo SPR y su expedite asociado", 
+                        size=14, color=COLORS['text_secondary']),
+                    main_cards,
+                    info_card,
+                    export_spr_card,
+                    chart_container
+                ], spacing=20),
+                padding=ft.padding.all(20)
+            )
+
+
+        # En la función update_dashboard(), modificar la sección de tabs:
         tabs = ft.Tabs(
             selected_index=0,
             animation_duration=300,
@@ -3801,11 +5809,26 @@ def main(page: ft.Page):
                 ft.Tab(
                     text="🏭 OBS/EXP LOC NET",
                     content=create_obsolete_expired_analysis(analyzer, page)
+                ),
+                # AGREGAR ESTA PESTAÑA:
+                ft.Tab(
+                    text="💳 Credit Memos",
+                    content=create_credit_memo_analysis(analyzer, page)
+                )
+                ,
+                # AGREGAR ESTA PESTAÑA:
+                ft.Tab(
+                    text="✈️ Limpieza PSU",
+                    content=create_psu_cleanup_analysis(analyzer, page)
+                ),
+                # NUEVA PESTAÑA:
+                ft.Tab(
+                    text="🚀 FCST SPR",
+                    content=create_fcst_spr_analysis(analyzer, page)
                 )
             ],
             expand=1
         )
-
         # Agregar header y tabs
         main_container.controls.append(header)
         main_container.controls.append(tabs)
