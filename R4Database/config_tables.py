@@ -1820,14 +1820,161 @@ TABLES_CONFIG = {
         R4_Account TEXT
     )"""
 },
-
 # ==================== TABLA invoiced====================
-
-
-
-
-
-
+# ==================== TABLA INVOICED ====================
+"invoiced": {
+    # Archivo principal (actualización diaria)
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\Invoiced\invExp.xlsx",
+    # Directorio histórico (carga completa)
+    "historical_directory": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\Invoiced\HISTORICO_YEAR",
+    
+    "table_name": "invoiced",
+    "file_type": "excel",
+    "excel_params": {
+    "skiprows": 3,  # Para archivo diario
+    "historical_skiprows": 0,  # Para archivos históricos 
+    "dtype": "str"
+    },
+    "expected_columns": [
+        'Entity-Code', 'Invoice-No', 'Line', 'SO-No', 'Customer', 'Type', 'Cust Name',
+        'PO-No', 'A/C', 'Spr-C', 'O-Cd', 'Proj', 'TC', 'Item Number', 'Description',
+        'UM', 'S-Qty', 'Price', 'Total', 'Curr', 'CustReqDt', 'Req-Date', 'Pln-Ship',
+        'Inv-Dt', 'Inv-Time', 'Ord-Dt', 'SODueDt', 'Due-Dt', 'TimeToConfirm(hr)',
+        'Plan-FillRate', 'TAT to fill an order', 'Cust-FillRate', 'SH', 'DG', 'Std Cost',
+        'Vendor-C', 'Stk', 'Std LT', 'Shipped-Dt', 'ShipTo', 'ViaDesc', 'Tracking No',
+        'AddntlTracking', 'CreditedInv', 'Invoice Line Memo', 'Lot No (Qty)',
+        'Manuf Charge', 'Inv-Credit', 'CM-Reason', 'User-Id', 'Cust-Item',
+        'Buyer-Name', 'Issue-Date', 'Memo[1]', 'Memo[2]'
+    ],
+    "columns_mapping": {
+        'Entity-Code': 'Entity_Code',
+        'Invoice-No': 'Invoice_No',
+        'SO-No': 'SO_No',
+        'Cust Name': 'Cust_Name',
+        'PO-No': 'PO_No',
+        'A/C': 'AC',
+        'Spr-C': 'Spr_C',
+        'O-Cd': 'O_Cd',
+        'Item Number': 'Item_Number',
+        'S-Qty': 'S_Qty',
+        'Inv-Dt': 'Inv_Dt',
+        'Inv-Time': 'Inv_Time',
+        'Ord-Dt': 'Ord_Dt',
+        'Due-Dt': 'Due_Dt',
+        'TimeToConfirm(hr)': 'TimeToConfirm_hr',
+        'Plan-FillRate': 'Plan_FillRate',
+        'TAT to fill an order': 'TAT_to_fill_an_order',
+        'Cust-FillRate': 'Cust_FillRate',
+        'Std Cost': 'Std_Cost',
+        'Vendor-C': 'Vendor_C',
+        'Std LT': 'Std_LT',
+        'Shipped-Dt': 'Shipped_Dt',
+        'Tracking No': 'Tracking_No',
+        'Invoice Line Memo': 'Invoice_Line_Memo',
+        'Lot No (Qty)': 'Lot_No_Qty',
+        'Manuf Charge': 'Manuf_Charge',
+        'Inv-Credit': 'Inv_Credit',
+        'CM-Reason': 'CM_Reason',
+        'User-Id': 'User_Id',
+        'Cust-Item': 'Cust_Item',
+        'Buyer-Name': 'Buyer_Name',
+        'Issue-Date': 'Issue_Date',
+        'Memo[1]': 'Memo_1',
+        'Memo[2]': 'Memo_2'
+    },
+    "columns_order_original": [
+        'Entity-Code', 'Invoice-No', 'Line', 'SO-No', 'Customer', 'Type', 'Cust Name',
+        'PO-No', 'A/C', 'Spr-C', 'O-Cd', 'Proj', 'TC', 'Item Number', 'Description',
+        'UM', 'S-Qty', 'Price', 'Total', 'Curr', 'CustReqDt', 'Req-Date', 'Pln-Ship',
+        'Inv-Dt', 'Inv-Time', 'Ord-Dt', 'SODueDt', 'Due-Dt', 'TimeToConfirm(hr)',
+        'Plan-FillRate', 'TAT to fill an order', 'Cust-FillRate', 'SH', 'DG', 'Std Cost',
+        'Vendor-C', 'Stk', 'Std LT', 'Shipped-Dt', 'ShipTo', 'ViaDesc', 'Tracking No',
+        'AddntlTracking', 'CreditedInv', 'Invoice Line Memo', 'Lot No (Qty)',
+        'Manuf Charge', 'Inv-Credit', 'CM-Reason', 'User-Id', 'Cust-Item',
+        'Buyer-Name', 'Issue-Date', 'Memo[1]', 'Memo[2]'
+    ],
+    "columns_order_renamed": [
+        'Entity_Code', 'Invoice_No', 'Line', 'SO_No', 'Customer', 'Type', 'Cust_Name',
+        'PO_No', 'AC', 'Spr_C', 'O_Cd', 'Proj', 'TC', 'Item_Number', 'Description',
+        'UM', 'S_Qty', 'Price', 'Total', 'Curr', 'CustReqDt', 'Req_Date', 'Pln_Ship',
+        'Inv_Dt', 'Inv_Time', 'Ord_Dt', 'SODueDt', 'Due_Dt', 'TimeToConfirm_hr',
+        'Plan_FillRate', 'TAT_to_fill_an_order', 'Cust_FillRate', 'SH', 'DG', 'Std_Cost',
+        'Vendor_C', 'Stk', 'Std_LT', 'Shipped_Dt', 'ShipTo', 'ViaDesc', 'Tracking_No',
+        'AddntlTracking', 'CreditedInv', 'Invoice_Line_Memo', 'Lot_No_Qty',
+        'Manuf_Charge', 'Inv_Credit', 'CM_Reason', 'User_Id', 'Cust_Item',
+        'Buyer_Name', 'Issue_Date', 'Memo_1', 'Memo_2'
+    ],
+    "special_processing": {
+        "clear_before_insert": False,  # NO limpiar automáticamente
+        "validate_columns": True,
+        "custom_cleaning": True,
+        "invoiced_special_mode": True,  # Modo especial para invoiced
+        "date_column": "Inv_Dt",  # Columna de control de fechas
+        "supports_dual_mode": True,  # Soporta modo incremental y completo
+        "numeric_conversion": ["S_Qty", "Price", "Total", "TimeToConfirm_hr", "Plan_FillRate", "TAT_to_fill_an_order", "Cust_FillRate", "Std_Cost", "Std_LT"],
+        "auto_detect_header": True
+    },
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS invoiced(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        Entity_Code TEXT,
+        Invoice_No TEXT,
+        Line TEXT,
+        SO_No TEXT,
+        Customer TEXT,
+        Type TEXT,
+        Cust_Name TEXT,
+        PO_No TEXT,
+        AC TEXT,
+        Spr_C TEXT,
+        O_Cd TEXT,
+        Proj TEXT,
+        TC TEXT,
+        Item_Number TEXT,
+        Description TEXT,
+        UM TEXT,
+        S_Qty REAL,
+        Price REAL,
+        Total REAL,
+        Curr TEXT,
+        CustReqDt TEXT,
+        Req_Date TEXT,
+        Pln_Ship TEXT,
+        Inv_Dt TEXT,
+        Inv_Time TEXT,
+        Ord_Dt TEXT,
+        SODueDt TEXT,
+        Due_Dt TEXT,
+        TimeToConfirm_hr REAL,
+        Plan_FillRate REAL,
+        TAT_to_fill_an_order REAL,
+        Cust_FillRate REAL,
+        SH TEXT,
+        DG TEXT,
+        Std_Cost REAL,
+        Vendor_C TEXT,
+        Stk TEXT,
+        Std_LT REAL,
+        Shipped_Dt TEXT,
+        ShipTo TEXT,
+        ViaDesc TEXT,
+        Tracking_No TEXT,
+        AddntlTracking TEXT,
+        CreditedInv TEXT,
+        Invoice_Line_Memo TEXT,
+        Lot_No_Qty TEXT,
+        Manuf_Charge TEXT,
+        Inv_Credit TEXT,
+        CM_Reason TEXT,
+        User_Id TEXT,
+        Cust_Item TEXT,
+        Buyer_Name TEXT,
+        Issue_Date TEXT,
+        Memo_1 TEXT,
+        Memo_2 TEXT,
+        file_source TEXT,
+        load_timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+    )"""
+},
 # ==================== TABLA RESPONSABLES ACTION WO by PLANTYPE====================
 "Work_order_Actions_responsibles_plantype": {
     "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\ActionCodes\Responsible_by_plantype.xlsx",
@@ -1856,11 +2003,6 @@ TABLES_CONFIG = {
     )"""
 }
 }
-
-
-
-
-
 
 
 # Rutas globales usando raw strings para evitar problemas con backslashes

@@ -28,6 +28,14 @@ except ImportError as e:
     print(f"❌ Error importando configuración: {e}")
     sys.exit(1)
 
+# Importar procesador de invoiced
+try:
+    from invoiced_processor import InvoicedProcessor
+    INVOICED_AVAILABLE = True
+except ImportError:
+    INVOICED_AVAILABLE = False
+    print("⚠️ invoiced_processor.py no encontrado - Pestaña Invoiced deshabilitada")
+
 class SimpleUpdater(QThread):
     """Actualizador simple para una tabla"""
     progress_update = pyqtSignal(str)
@@ -385,6 +393,468 @@ class BulkUpdater(QThread):
         finally:
             conn.close()
 
+class InvoicedUpdater(QThread):
+    """Thread especializado para actualización de tabla invoiced"""
+    progress_update = pyqtSignal(str)
+    finished_update = pyqtSignal(bool, str, dict)
+    
+    def __init__(self, mode="incremental"):
+        """
+        Args:
+            mode: "incremental" para modo diario, "complete" para carga completa
+        """
+        super().__init__()
+        self.mode = mode
+        self.db_path = os.path.join(BASE_PATHS["db_folder"], "R4Database.db")
+        
+    def run(self):
+        try:
+            # Importar el procesador (lazy import para evitar problemas)
+            try:
+                from invoiced_processor import InvoicedProcessor
+            except ImportError:
+                self.finished_update.emit(
+                    False, 
+                    "Error: No se encontró invoiced_processor.py. Asegúrate de crear el archivo.", 
+                    {}
+                )
+                return
+            
+            # Crear procesador
+            processor = InvoicedProcessor(self.db_path)
+            
+            # Validar archivos
+            self.progress_update.emit("🔍 Validando disponibilidad de archivos...")
+            validation = processor.validate_files_availability()
+            
+            if not validation['all_ready']:
+                missing = []
+                if not validation['current_file_exists']:
+                    missing.append("Archivo actual (invExp.xlsx)")
+                if not validation['historical_dir_exists']:
+                    missing.append("Directorio HISTORICO_YEAR")
+                
+                self.finished_update.emit(
+                    False,
+                    f"Archivos no disponibles: {', '.join(missing)}",
+                    validation
+                )
+                return
+            
+            # Ejecutar según el modo
+            if self.mode == "incremental":
+                self.progress_update.emit("🔄 Ejecutando modo INCREMENTAL...")
+                result = processor.process_incremental_mode()
+            elif self.mode == "complete":
+                self.progress_update.emit("🚀 Ejecutando modo COMPLETO...")
+                result = processor.process_full_mode()
+            else:
+                self.finished_update.emit(
+                    False,
+                    f"Modo desconocido: {self.mode}",
+                    {}
+                )
+                return
+            
+            # Obtener estadísticas finales
+            if result['success']:
+                self.progress_update.emit("📊 Obteniendo estadísticas finales...")
+                final_stats = processor.get_database_stats()
+                result['stats']['final_db_stats'] = final_stats
+            
+            # Emitir resultado
+            self.finished_update.emit(
+                result['success'],
+                result['message'],
+                result['stats']
+            )
+            
+        except Exception as e:
+            self.finished_update.emit(
+                False,
+                f"Error crítico en InvoicedUpdater: {str(e)}",
+                {}
+            )
+
+class InvoicedTab(QWidget):
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.db_path = os.path.join(BASE_PATHS["db_folder"], "R4Database.db")
+        self.updater_thread = None
+        self.setup_ui()
+        self.load_initial_stats()
+    
+    def setup_ui(self):
+        """Configura la interfaz de usuario"""
+        layout = QVBoxLayout(self)
+        
+        # Título principal
+        title_label = QLabel("🧾 GESTIÓN TABLA INVOICED")
+        title_label.setFont(QFont("Arial", 16, QFont.Bold))
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setStyleSheet("color: #2c3e50; margin: 10px; padding: 10px;")
+        layout.addWidget(title_label)
+        
+        # Panel de información
+        self.create_info_panel(layout)
+        
+        # Panel de controles
+        self.create_controls_panel(layout)
+        
+        # Barra de progreso
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        layout.addWidget(self.progress_bar)
+        
+        # Panel de estadísticas
+        self.create_stats_panel(layout)
+        
+        # Log de operaciones
+        self.create_log_panel(layout)
+    
+    def create_info_panel(self, layout):
+        """Crea panel de información"""
+        info_group = QGroupBox("ℹ️ Información del Sistema")
+        info_layout = QVBoxLayout(info_group)
+        
+        info_text = """
+• MODO INCREMENTAL: Procesa solo invExp.xlsx con control de duplicados por fecha
+• MODO COMPLETO: Procesa TODOS los archivos históricos + archivo actual
+• Sistema automático de prevención de duplicados
+• Backup automático después de actualizaciones masivas
+        """
+        
+        info_label = QLabel(info_text.strip())
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #34495e; padding: 10px;")
+        info_layout.addWidget(info_label)
+        
+        layout.addWidget(info_group)
+    
+    def create_controls_panel(self, layout):
+        """Crea panel de controles"""
+        controls_group = QGroupBox("🎛️ Controles de Operación")
+        controls_layout = QHBoxLayout(controls_group)
+        
+        # Botón modo incremental
+        self.incremental_btn = QPushButton("🔄 Actualización Incremental")
+        self.incremental_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover { background-color: #2980b9; }
+            QPushButton:disabled { background-color: #95a5a6; }
+        """)
+        self.incremental_btn.clicked.connect(self.start_incremental_update)
+        
+        # Botón modo completo
+        self.complete_btn = QPushButton("🚀 Carga Completa")
+        self.complete_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e74c3c;
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover { background-color: #c0392b; }
+            QPushButton:disabled { background-color: #95a5a6; }
+        """)
+        self.complete_btn.clicked.connect(self.start_complete_update)
+        
+        # Botón estadísticas
+        self.stats_btn = QPushButton("📊 Actualizar Estadísticas")
+        self.stats_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #95a5a6;
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover { background-color: #7f8c8d; }
+        """)
+        self.stats_btn.clicked.connect(self.refresh_stats)
+        
+        # Botón limpiar tabla
+        self.clear_btn = QPushButton("🗑️ Limpiar Tabla")
+        self.clear_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f39c12;
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover { background-color: #e67e22; }
+            QPushButton:disabled { background-color: #95a5a6; }
+        """)
+        self.clear_btn.clicked.connect(self.clear_table)
+        
+        controls_layout.addWidget(self.incremental_btn)
+        controls_layout.addWidget(self.complete_btn)
+        controls_layout.addWidget(self.stats_btn)
+        controls_layout.addWidget(self.clear_btn)
+        
+        layout.addWidget(controls_group)
+    
+    def create_stats_panel(self, layout):
+        """Crea panel de estadísticas"""
+        stats_group = QGroupBox("📈 Estadísticas de la Tabla")
+        stats_layout = QHBoxLayout(stats_group)
+        
+        # Estadísticas básicas
+        self.total_records_label = QLabel("Total: --")
+        self.unique_invoices_label = QLabel("Facturas únicas: --")
+        self.date_range_label = QLabel("Rango fechas: --")
+        self.files_loaded_label = QLabel("Archivos cargados: --")
+        
+        # Aplicar estilo
+        for label in [self.total_records_label, self.unique_invoices_label, 
+                     self.date_range_label, self.files_loaded_label]:
+            label.setStyleSheet("""
+                QLabel {
+                    background-color: #ecf0f1;
+                    border: 1px solid #bdc3c7;
+                    border-radius: 4px;
+                    padding: 8px;
+                    font-weight: bold;
+                }
+            """)
+        
+        stats_layout.addWidget(self.total_records_label)
+        stats_layout.addWidget(self.unique_invoices_label)
+        stats_layout.addWidget(self.date_range_label)
+        stats_layout.addWidget(self.files_loaded_label)
+        
+        layout.addWidget(stats_group)
+    
+    def create_log_panel(self, layout):
+        """Crea panel de log"""
+        log_group = QGroupBox("📄 Log de Operaciones")
+        log_layout = QVBoxLayout(log_group)
+        
+        # Controles del log
+        log_controls = QHBoxLayout()
+        
+        clear_log_btn = QPushButton("🗑️ Limpiar Log")
+        clear_log_btn.clicked.connect(self.clear_log)
+        clear_log_btn.setMaximumWidth(120)
+        
+        log_controls.addWidget(clear_log_btn)
+        log_controls.addStretch()
+        
+        log_layout.addLayout(log_controls)
+        
+        # Widget de log
+        self.log_text = QTextEdit()
+        self.log_text.setMaximumHeight(200)
+        self.log_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #2c3e50;
+                color: #ecf0f1;
+                border: 1px solid #34495e;
+                border-radius: 5px;
+                padding: 10px;
+                font-family: 'Courier New', monospace;
+            }
+        """)
+        log_layout.addWidget(self.log_text)
+        
+        layout.addWidget(log_group)
+    
+    def load_initial_stats(self):
+        """Carga estadísticas iniciales"""
+        self.refresh_stats()
+    
+    def refresh_stats(self):
+        """Actualiza las estadísticas"""
+        try:
+            from invoiced_processor import InvoicedProcessor
+            
+            processor = InvoicedProcessor(self.db_path)
+            stats = processor.get_database_stats()
+            
+            if stats.get('table_exists', False):
+                self.total_records_label.setText(f"Total: {stats['total_records']:,}")
+                self.unique_invoices_label.setText(f"Facturas únicas: {stats['unique_invoices']:,}")
+                
+                if stats['min_date'] and stats['max_date']:
+                    self.date_range_label.setText(f"Rango: {stats['min_date']} a {stats['max_date']}")
+                else:
+                    self.date_range_label.setText("Rango: Sin datos")
+                
+                
+                files_count = stats.get('files_loaded', 0)
+                self.files_loaded_label.setText(f"Años con datos: {files_count}")
+                
+            else:
+                self.total_records_label.setText("Total: 0")
+                self.unique_invoices_label.setText("Facturas únicas: 0")
+                self.date_range_label.setText("Rango: Sin datos")
+                self.files_loaded_label.setText("Archivos: 0")
+            
+            self.log_message("📊 Estadísticas actualizadas", "info")
+            
+        except Exception as e:
+            self.log_message(f"❌ Error actualizando estadísticas: {str(e)}", "error")
+    
+    def log_message(self, message, msg_type="info"):
+        """Agrega mensaje al log"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        colors = {
+            "info": "#3498db",
+            "success": "#27ae60", 
+            "warning": "#f39c12",
+            "error": "#e74c3c"
+        }
+        
+        color = colors.get(msg_type, "#ecf0f1")
+        
+        formatted_message = f'<span style="color: {color};">[{timestamp}] {message}</span>'
+        self.log_text.append(formatted_message)
+        
+        # Auto scroll
+        scrollbar = self.log_text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+    
+    def clear_log(self):
+        """Limpia el log"""
+        self.log_text.clear()
+        self.log_message("Log limpiado", "info")
+    
+    def start_incremental_update(self):
+        """Inicia actualización incremental"""
+        if self.updater_thread and self.updater_thread.isRunning():
+            QMessageBox.warning(self, "Operación en Curso", "Ya hay una operación en curso.")
+            return
+        
+        reply = QMessageBox.question(
+            self,
+            "Actualización Incremental",
+            "🔄 ¿Ejecutar actualización incremental?\n\n"
+            "Esto procesará solo el archivo invExp.xlsx con control de duplicados.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes
+        )
+        
+        if reply == QMessageBox.Yes:
+            self.log_message("🔄 Iniciando actualización incremental...", "info")
+            self.set_buttons_enabled(False)
+            self.progress_bar.setVisible(True)
+            self.progress_bar.setRange(0, 0)
+            
+            self.updater_thread = InvoicedUpdater("incremental")
+            self.updater_thread.progress_update.connect(lambda msg: self.log_message(msg, "info"))
+            self.updater_thread.finished_update.connect(self.on_update_finished)
+            self.updater_thread.start()
+    
+    def start_complete_update(self):
+        """Inicia carga completa"""
+        if self.updater_thread and self.updater_thread.isRunning():
+            QMessageBox.warning(self, "Operación en Curso", "Ya hay una operación en curso.")
+            return
+        
+        reply = QMessageBox.question(
+            self,
+            "Carga Completa",
+            "🚀 ¿Ejecutar carga completa?\n\n"
+            "⚠️ ADVERTENCIA: Esto eliminará TODOS los datos existentes\n"
+            "y cargará todos los archivos históricos + archivo actual.\n\n"
+            "¿Continuar?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            self.log_message("🚀 Iniciando carga completa...", "warning")
+            self.set_buttons_enabled(False)
+            self.progress_bar.setVisible(True)
+            self.progress_bar.setRange(0, 0)
+            
+            self.updater_thread = InvoicedUpdater("complete")
+            self.updater_thread.progress_update.connect(lambda msg: self.log_message(msg, "info"))
+            self.updater_thread.finished_update.connect(self.on_update_finished)
+            self.updater_thread.start()
+    
+    def clear_table(self):
+        """Limpia la tabla completa"""
+        reply = QMessageBox.question(
+            self,
+            "Limpiar Tabla",
+            "🗑️ ¿Eliminar TODOS los registros de la tabla invoiced?\n\n"
+            "⚠️ Esta acción NO se puede deshacer.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            try:
+                from invoiced_processor import InvoicedProcessor
+                
+                processor = InvoicedProcessor(self.db_path)
+                success = processor.clear_table()
+                
+                if success:
+                    self.log_message("🗑️ Tabla limpiada exitosamente", "success")
+                    self.refresh_stats()
+                else:
+                    self.log_message("❌ Error limpiando tabla", "error")
+                    
+            except Exception as e:
+                self.log_message(f"❌ Error: {str(e)}", "error")
+    
+    def on_update_finished(self, success, message, stats):
+        """Maneja la finalización de actualizaciones"""
+        self.progress_bar.setVisible(False)
+        self.set_buttons_enabled(True)
+        
+        if success:
+            self.log_message(f"✅ {message}", "success")
+            
+            # Mostrar estadísticas detalladas
+            if 'total_records' in stats:
+                self.log_message(f"📊 Registros procesados: {stats['total_records']:,}", "info")
+            
+            if 'records_inserted' in stats:
+                self.log_message(f"💾 Registros insertados: {stats['records_inserted']:,}", "info")
+            
+            if 'records_deleted' in stats:
+                self.log_message(f"🗑️ Registros eliminados: {stats['records_deleted']:,}", "info")
+            
+            # Actualizar estadísticas
+            self.refresh_stats()
+            
+            # Mostrar diálogo de confirmación
+            QMessageBox.information(
+                self,
+                "Operación Completada",
+                f"✅ {message}\n\n📊 Ver log para detalles completos."
+            )
+        else:
+            self.log_message(f"❌ {message}", "error")
+            QMessageBox.warning(self, "Error", f"❌ {message}")
+    
+    def set_buttons_enabled(self, enabled):
+        """Habilita/deshabilita botones"""
+        self.incremental_btn.setEnabled(enabled)
+        self.complete_btn.setEnabled(enabled)
+        self.clear_btn.setEnabled(enabled)
+
 class R4EasyApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -421,8 +891,9 @@ class R4EasyApp(QMainWindow):
         # Pestaña 1: Control Individual
         self.setup_individual_tab()
         
-        # Pestaña 2: Actualización Masiva
         self.setup_bulk_tab()
+        if INVOICED_AVAILABLE:
+            self.setup_invoiced_tab()
         
     def setup_individual_tab(self):
         """Configura la pestaña de control individual"""
@@ -653,6 +1124,15 @@ class R4EasyApp(QMainWindow):
         
         self.tab_widget.addTab(bulk_widget, "🚀 Actualización Masiva")
     
+    def setup_invoiced_tab(self):
+        """Configura la pestaña especializada para Invoiced"""
+        if INVOICED_AVAILABLE:
+            invoiced_widget = InvoicedTab(self)
+            self.tab_widget.addTab(invoiced_widget, "🧾 INVOICED")
+            self.bulk_log_message("✅ Pestaña Invoiced agregada exitosamente")
+        else:
+            self.bulk_log_message("⚠️ Pestaña Invoiced no disponible - falta invoiced_processor.py")
+
     def load_initial_data(self):
         """Carga datos iniciales"""
         self.refresh_status()
