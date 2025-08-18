@@ -1721,7 +1721,7 @@ TABLES_CONFIG = {
     "table_name": "slowmotion",
     "file_type": "fixed_width",
     "fixed_width_params": {
-        "widths": [31, 22, 3, 1, 3, 11, 10, 15, 4, 9, 9, 5, 8, 3, 4, 8, 7, 4, 9, 12, 50],
+        "widths": [31, 22, 3, 1, 3, 11, 10, 15, 4, 9, 9, 5, 8, 3, 4, 8, 7, 4, 9, 12, 13],
         "header": 3,
         "skip_rows": [0]
     },

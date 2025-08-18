@@ -1628,7 +1628,7 @@ def create_wo_clear_tab(dashboard):
         # Tabla del 80% con búsqueda y registro
         ft.Container(
             content=ft.Column([
-                ft.Text("🏆 Top 80% WOs Más Costosas", 
+                ft.Text("🏆 Top 20% WOs Más Costosas", 
                     size=20, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
                 ft.Text("WOs que concentran el mayor valor (Scrollable y Seleccionable)", 
                     size=12, color=COLORS['text_secondary']),

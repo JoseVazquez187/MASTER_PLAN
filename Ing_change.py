@@ -2469,7 +2469,7 @@ class ObsoleteAnalyzerApp:
                 title="Items Nuevos",
                 value=f"{m.get('new_items_count', 0):,}",
                 subtitle="Pendientes análisis",
-                color="#ff9800",  # Naranja
+                color="#ff9800",  # Naranja693
                 icon_color="#ff9800"
             ),
             self._create_enhanced_metric_card(
