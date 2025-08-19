@@ -265,11 +265,11 @@ def main(page: ft.Page):
 
 
 
-
         def update_user_metrics():
             user_container.controls.clear()
             user_metrics_table.rows.clear()
             user_metrics = dashboard.get_user_metrics()
+            
             if len(user_metrics) == 0:
                 user_container.controls.append(
                     ft.Container(
@@ -282,6 +282,8 @@ def main(page: ft.Page):
                 )
                 page.update()
                 return
+            
+            # Métricas existentes
             total_responsibles = len(user_metrics)
             responsibles_high_risk = len(user_metrics[user_metrics['Risk_Score'] >= 10])
             responsibles_with_critical = len(user_metrics[user_metrics['Critical_Actions'] > 0])
@@ -289,6 +291,10 @@ def main(page: ft.Page):
             avg_actions_per_responsible = user_metrics['Total_Actions'].mean()
             avg_days_all_responsibles = user_metrics['Avg_Days'].mean()
             total_emitido = dashboard.df_enriched['Total_ValQtyIssued'].sum() if dashboard.df_enriched is not None else 0
+            
+            # NUEVA MÉTRICA: WOs únicas afectadas por cancelación
+            total_unique_wos = dashboard.df_enriched['WO_Number'].nunique() if dashboard.df_enriched is not None else 0
+            
             user_header = ft.Container(
                 content=ft.Column([
                     ft.Text("👥 Análisis por Responsable", size=28, weight=ft.FontWeight.BOLD, color=COLORS['text_primary']),
@@ -308,6 +314,8 @@ def main(page: ft.Page):
                 bgcolor=COLORS['primary'],
                 border_radius=12
             )
+            
+            # MODIFICAR esta sección para incluir el nuevo card:
             user_summary_metrics = ft.Row([
                 create_compact_metric_card(
                     "Total Responsables",
@@ -331,6 +339,13 @@ def main(page: ft.Page):
                     "🔥"
                 ),
                 create_compact_metric_card(
+                    "WOs Únicas Afectadas",  # NUEVO CARD
+                    f"{total_unique_wos:,}",
+                    "Work Orders con cancelaciones",
+                    COLORS['accent'],
+                    "🔧"
+                ),
+                create_compact_metric_card(
                     "Promedio Acciones",
                     f"{avg_actions_per_responsible:.1f}",
                     f"Valor total: ${total_value_managed:,.0f}",
@@ -338,6 +353,8 @@ def main(page: ft.Page):
                     "📊"
                 ),
             ], wrap=True, spacing=15)
+            
+            # El resto del código permanece igual...
             additional_metrics = ft.Row([
                 create_compact_metric_card(
                     "Valor Total Gestionado",
@@ -360,9 +377,11 @@ def main(page: ft.Page):
                     COLORS['warning'],
                     "⏰"
                 ),
-                
-                
             ], wrap=True, spacing=15)
+
+
+
+
             for _, user in user_metrics.head(15).iterrows():
                 if user['Ranking'] <= 3:
                     rank_color = COLORS['error']
