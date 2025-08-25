@@ -134,8 +134,8 @@ class KiteoDashboard:
                 # Combinar ambos bloques
                 propuesta_final = pd.concat([propuesta_pastdue, propuesta_cf], ignore_index=True)
                 propuesta_final.columns = ['ItemNo', 'Entity', 'DateStatus', 'WO_List', 'Description',
-                                         'OpenQty_Total', 'QtyFcst_Total', 'ReqDate_Min', 'ReqDate_Max',
-                                         'Rev', 'UM', 'Proj']
+                                        'OpenQty_Total', 'QtyFcst_Total', 'ReqDate_Min', 'ReqDate_Max',
+                                        'Rev', 'UM', 'Proj']
                 
                 propuesta_final['WO_Count'] = propuesta_final['WO_List'].apply(len)
                 propuesta_final['WO_String'] = propuesta_final['WO_List'].apply(lambda x: ','.join(map(str, x)))

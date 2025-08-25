@@ -936,7 +936,7 @@ TABLES_CONFIG = {
 },
 # ==================== TABLA WOINQUIRY ====================
 "woinquiry": {
-    "source_file": r"J:\Departments\Material Control\Purchasing\Tools\ComprasDB\WO_Inquiry.xlsx",
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\WOInquiry\WOInquiry.xlsx",
     "table_name": "WOInquiry",
     "file_type": "excel",
     "excel_params": {
@@ -1821,7 +1821,6 @@ TABLES_CONFIG = {
     )"""
 },
 # ==================== TABLA invoiced====================
-# ==================== TABLA INVOICED ====================
 "invoiced": {
     # Archivo principal (actualización diaria)
     "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\Invoiced\invExp.xlsx",
@@ -1975,6 +1974,121 @@ TABLES_CONFIG = {
         load_timestamp TEXT DEFAULT CURRENT_TIMESTAMP
     )"""
 },
+# ==================== TABLA WIP ====================
+# ==================== TABLA WIP - CONFIGURACIÓN SIMPLIFICADA ====================
+"wip": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\PR 5 19\PR519.txt",
+    "table_name": "wip",
+    "file_type": "fixed_width",
+    "fixed_width_params": {
+        "widths": [12,29,11,31,10,11,9,10,11,15,11,11,11],
+        "header": 3,
+        "skip_rows": [0]  # Ya elimina la primera fila aquí
+    },
+    
+    # ✅ USAR ORDEN DE MAPEO DIRECTO
+    "columns_mapping": {
+        "Entity   A/C": "WONo",
+        "-No   Unit             #  WO-": "ItemNo", 
+        "No        $": "PlanType",
+        "Issued     Full BOM $   % Cmp": "Description",
+        "Full L": "DueDate",
+        "abor    Cur": "ReqQty",
+        "r Labor": "OpenQty", 
+        "WIP Val": "QtyComp",
+        "ue": "IssueWip",
+        "Detail-Calc": "FullBom",
+        "Unnamed: 10": "PercentCom",
+        "Unnamed: 11": "Full_Labor",
+        "Unnamed: 12": "Curr_Labor"
+    },
+    
+    "columns_order_original": [
+        "Entity   A/C", "-No   Unit             #  WO-", "No        $",
+        "Issued     Full BOM $   % Cmp", "Full L", "abor    Cur", "r Labor",
+        "WIP Val", "ue", "Detail-Calc", "Unnamed: 10", "Unnamed: 11", "Unnamed: 12"
+    ],
+    
+    "columns_order_renamed": [
+        "WONo", "ItemNo", "PlanType", "Description", "DueDate", "ReqQty",
+        "OpenQty", "QtyComp", "IssueWip", "FullBom", "PercentCom", 
+        "Full_Labor", "Curr_Labor"
+    ],
+    
+    # ✅ FILTROS DE DATOS INTEGRADOS
+    "data_filters": {
+        "exclude_rows_multiple": {
+            "WONo": ["EZ", "WO-No", "End-of-Repor", "---"],
+            "ItemNo": ["Total:", "Report Totals:", "Unit"]
+        },
+        "exclude_empty_rows": ["ItemNo"]  # No permitir ItemNo vacío
+    },
+    
+    "special_processing": {
+        "clear_before_insert": True,
+        "custom_cleaning": True,
+        "final_columns_only": True,
+        "wip_simplified_logic": True  # ✅ NUEVO FLAG SIMPLIFICADO
+    },
+    
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS wip(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        WONo TEXT,
+        ItemNo TEXT,
+        PlanType TEXT,
+        Description TEXT,
+        DueDate TEXT,
+        ReqQty TEXT,
+        OpenQty TEXT,
+        QtyComp TEXT,
+        IssueWip TEXT,
+        FullBom TEXT,
+        PercentCom TEXT,
+        Full_Labor TEXT,
+        Curr_Labor TEXT
+    )"""
+},
+# ==================== TABLA WIP CON NOMBRES REALES ====================
+
+# ==================== TABLA FINISHGOOD (LIMPIA - SIN ERRORES SQL) ==================== 
+"finishgood": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\IN 5 39\IN539.txt",
+    "table_name": "finishgood",
+    "file_type": "fixed_width",
+    "fixed_width_params": {
+        "widths": [9,31,21,10,3,3,10,9,9,14,14,15,20,15,10,17,10,10],
+        "header": 3,
+        "skip_rows": [0]
+    },
+    "special_processing": {
+        "clear_before_insert": True,
+        "custom_cleaning": True,
+        "finishgood_special_processing": True,
+        "final_columns_only": True
+    },
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS finishgood(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ItemNo TEXT,
+        Description TEXT,
+        DueDate TEXT,
+        TDate TEXT,
+        UM TEXT,
+        Wh TEXT,
+        OrderNo TEXT,
+        OpenQty TEXT,
+        StdCost TEXT,
+        LOT TEXT,
+        Qty TEXT,
+        ExtCost TEXT,
+        Bin TEXT,
+        StdLabor TEXT,
+        StdMatl TEXT,
+        Unnamed_15 TEXT,
+        Entity TEXT,
+        Project TEXT
+    )"""
+},
+
 # ==================== TABLA RESPONSABLES ACTION WO by PLANTYPE====================
 "Work_order_Actions_responsibles_plantype": {
     "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\ActionCodes\Responsible_by_plantype.xlsx",
@@ -2514,57 +2628,6 @@ def process_superbom_complete(df, table_config):
     
     return df
 
-def apply_special_processing(df, table_config):
-    """Aplica procesamiento especial según configuración - VERSIÓN ACTUALIZADA"""
-    special_processing = table_config.get("special_processing", {})
-    table_name = table_config.get("table_name", "")
-    
-    # ========== PROCESAMIENTO ESPECIAL PARA SUPERBOM ==========
-    if (table_name == "bom" and 
-        special_processing.get("generate_key_by_level", False) and
-        special_processing.get("custom_cleaning", False)):
-        
-        print(f"🎯 Aplicando procesamiento especial para SUPERBOM...")
-        df = process_superbom_complete(df, table_config)  # Usar la función mejorada
-        return df  # Retornar aquí porque ya incluye toda la lógica necesaria
-    
-    # ========== PROCESAMIENTO ORIGINAL PARA OTRAS TABLAS ==========
-    
-    # Procesamiento de fechas de expiración para reworkloc_all
-    if special_processing.get("fill_expire_date", False):
-        expire_col = None
-        for col in df.columns:
-            if 'expire' in col.lower() or 'expir' in col.lower():
-                expire_col = col
-                break
-        
-        if expire_col:
-            print(f"   📅 Procesando fechas de expiración en columna: {expire_col}")
-            import pandas as pd
-            from datetime import datetime
-            
-            current_date = datetime.today().date()
-            years_to_add = special_processing.get("expire_years", 2)
-            future_date = pd.Timestamp(current_date) + pd.DateOffset(years=years_to_add)
-            
-            df[expire_col].fillna(future_date.normalize(), inplace=True)
-            print(f"   ✅ Fechas nulas rellenadas con: {future_date.date()}")
-    
-    # Procesamiento para arreglar años de fecha de expiración
-    if special_processing.get("fix_expire_date_year", False):
-        import pandas as pd
-        
-        year_threshold = special_processing.get("year_threshold", 1950)
-        year_adjustment = special_processing.get("year_adjustment", 100)
-        
-        for col in df.columns:
-            if 'expire' in col.lower() or 'expir' in col.lower():
-                print(f"   📅 Corrigiendo años en columna: {col}")
-                # Lógica para corregir años (si es necesario)
-                break
-    
-    return df
-
 def clean_data_remove_quotes(df):
     """Remueve comillas simples de todas las columnas"""
     print("   🧹 Removiendo comillas simples...")
@@ -2814,16 +2877,40 @@ def process_whs_location_exact(df, table_config):
     
     return df
 
+# =============================================================================
+# AGREGAR/REEMPLAZAR EN config_tables.py - PROCESAMIENTO WIP EXACTO
+# ====================================================================================
+# ACTUALIZAR apply_special_processing PARA USAR LA NUEVA FUNCIÓN
+# =============================================================================
+
 def apply_special_processing(df, table_config):
-    """Aplica procesamiento especial - VERSIÓN CORREGIDA SIN ERRORES"""
+    """Aplica procesamiento especial - CON TU LÓGICA WIP EXACTA"""
     special_processing = table_config.get("special_processing", {})
     table_name = table_config.get("table_name", "")
     
+    # ========== PROCESAMIENTO WIP CON TU LÓGICA EXACTA ==========
+    # if (table_name == "wip" and 
+    #     special_processing.get("wip_exact_logic", False) and
+    #     special_processing.get("custom_cleaning", False)):
+        
+    #     print(f"🎯 Aplicando TU lógica exacta para WIP...")
+    #     df = process_wip_direct(db_path)
+    #     return df  # Retornar inmediatamente después del procesamiento
+    
+    # ========== PROCESAMIENTO ESPECIAL PARA FINISHGOOD ==========
+    # if (table_name == "finishgood" and 
+    #     special_processing.get("finishgood_special_processing", False) and
+    #     special_processing.get("custom_cleaning", False)):
+        
+    #     print(f"🎯 Aplicando procesamiento especial para FINISHGOOD...")
+    #     df = process_finishgood_with_custom_logic(df, table_config)
+    #     return df
+        
     # ========== TU LÓGICA EXACTA PARA WHS LOCATION ==========
     if table_name == "whs_location_in36851":
         print(f"🎯 Detectada whs_location_in36851 - usando tu código exacto...")
         df = process_whs_location_exact(df, table_config)
-        return df  # ✅ Retornar inmediatamente después del procesamiento
+        return df
     
     # ========== PROCESAMIENTO ESPECIAL PARA SUPERBOM ==========
     if (table_name == "bom" and 
@@ -2839,7 +2926,6 @@ def apply_special_processing(df, table_config):
         special_processing.get("custom_cleaning", False)):
         
         print(f"🎯 Aplicando procesamiento especial para KITING GROUPS...")
-        # ✅ CORREGIDO: Usar la función correcta que ya existe en tu código
         df = apply_data_filters(df, table_config)
         return df
     
@@ -2880,20 +2966,343 @@ def apply_special_processing(df, table_config):
     return df
 
 
+"""aqui"""
+
+
+# =============================================================================
+# FUNCIONES FALTANTES - AGREGAR AL FINAL DE config_tables.py
+# =============================================================================
+
+
+def process_wip_direct(db_path):
+    """
+    Procesador DIRECTO para WIP usando tu código exacto
+    """
+    import pandas as pd
+    import sqlite3
+    import os
+    from datetime import datetime
+    
+    print(f"🎯 PROCESAMIENTO DIRECTO DE WIP - Tu código exacto")
+    
+    try:
+        # PASO 1: Leer archivo con tu código exacto
+        print(f"📖 Leyendo archivo PR519.txt...")
+        df = pd.read_fwf(
+            r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\PR 5 19\PR519.txt",
+            widths=[12,29,11,31,10,11,9,10,11,15,11,11,11], 
+            header=3
+        )
+        print(f"   ✅ Archivo leído: {len(df)} filas, {len(df.columns)} columnas")
+        
+        # PASO 2: Tu procesamiento exacto
+        print(f"🔧 Aplicando tu lógica de limpieza...")
+        
+        df.drop([0], axis=0, inplace=True)
+        print(f"   🗑️ Eliminada fila 0: {len(df)} filas restantes")
+        
+        df = df.loc[df['Entity   A/C']!='EZ']
+        print(f"   🔽 Filtro Entity A/C != EZ: {len(df)} filas")
+        
+        df["left"] = df["Entity   A/C"].str[:2]
+        df["left"] = df["left"].str.upper()
+        df = df.loc[df['left']!='EZ']
+        print(f"   🔽 Filtro left != EZ: {len(df)} filas")
+        
+        df = df.loc[df['Entity   A/C']!='WO-No']
+        print(f"   🔽 Filtro Entity A/C != WO-No: {len(df)} filas")
+        
+        df = df.loc[df['Entity   A/C']!='End-of-Repor']
+        print(f"   🔽 Filtro Entity A/C != End-of-Repor: {len(df)} filas")
+        
+        df = df.loc[df['Entity   A/C']!='---']
+        print(f"   🔽 Filtro Entity A/C != ---: {len(df)} filas")
+        
+        df = df.loc[df['-No   Unit             #  WO-']!='Total:']
+        print(f"   🔽 Filtro No Unit != Total: {len(df)} filas")
+        
+        df = df.fillna('')
+        print(f"   🔧 NaN rellenados")
+        
+        df = df.loc[df['-No   Unit             #  WO-']!='']
+        print(f"   🔽 Filtro No Unit != vacío: {len(df)} filas")
+        
+        df = df.loc[df['-No   Unit             #  WO-']!='Report Totals:']
+        print(f"   🔽 Filtro No Unit != Report Totals: {len(df)} filas")
+        
+        df = df.drop(columns=['left'])
+        print(f"   🗑️ Eliminada columna left")
+        
+        # PASO 3: Tu renombrado exacto
+        print(f"🔄 Aplicando tu renombrado exacto...")
+        df = df.rename(columns = {
+            'Entity   A/C':'WONo',
+            '-No   Unit             #  WO-':'ItemNo',
+            'No        $':'PlanType',
+            'Issued     Full BOM $   % Cmp':'Description',
+            'Full L':'DueDate',
+            'abor    Cur':'ReqQty',
+            'r Labor':'OpenQty',
+            'WIP Val':'QtyComp',
+            'ue':'IssueWip',
+            'Detail-Calc':'FullBom',
+            'Unnamed: 10':'PercentCom',  # Cambié %Com por PercentCom para SQL
+            'Unnamed: 11':'Full_Labor',
+            'Unnamed: 12':'Curr_Labor'
+        })
+        print(f"   ✅ Columnas renombradas: {list(df.columns)}")
+        print(f"   📊 Datos finales: {len(df)} filas procesadas")
+        
+        # PASO 4: Conectar a base de datos
+        print(f"💾 Conectando a base de datos...")
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # PASO 5: Verificar si tabla existe
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wip'")
+        table_exists = cursor.fetchone() is not None
+        
+        if table_exists:
+            print(f"   🗑️ Tabla WIP existe - eliminando contenido...")
+            cursor.execute("DELETE FROM wip")
+            print(f"   ✅ Contenido eliminado")
+        else:
+            print(f"   🆕 Tabla WIP no existe - creando...")
+            create_table_sql = """CREATE TABLE wip(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                WONo TEXT,
+                ItemNo TEXT,
+                PlanType TEXT,
+                Description TEXT,
+                DueDate TEXT,
+                ReqQty TEXT,
+                OpenQty TEXT,
+                QtyComp TEXT,
+                IssueWip TEXT,
+                FullBom TEXT,
+                PercentCom TEXT,
+                Full_Labor TEXT,
+                Curr_Labor TEXT
+            )"""
+            cursor.execute(create_table_sql)
+            print(f"   ✅ Tabla creada")
+        
+        # PASO 6: Insertar datos
+        print(f"💾 Insertando {len(df)} registros...")
+        df.to_sql('wip', conn, if_exists='append', index=False)
+        
+        # PASO 7: Verificar inserción
+        cursor.execute("SELECT COUNT(*) FROM wip")
+        final_count = cursor.fetchone()[0]
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"   ✅ Inserción completada: {final_count} registros en BD")
+        
+        # PASO 8: Mostrar muestra de datos insertados
+        if not df.empty:
+            print(f"📄 Muestra de datos procesados:")
+            for i in range(min(5, len(df))):
+                wono = df.iloc[i]['WONo']
+                itemno = df.iloc[i]['ItemNo']
+                plantype = df.iloc[i]['PlanType']
+                print(f"   Fila {i+1}: WONo='{wono}', ItemNo='{itemno}', PlanType='{plantype}'")
+        
+        # PASO 9: Estadísticas finales
+        stats = {
+            "success": True,
+            "records_processed": len(df),
+            "records_in_db": final_count,
+            "table_recreated": not table_exists,
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        return True, f"WIP procesada exitosamente - {final_count} registros", stats
+        
+    except Exception as e:
+        error_msg = f"Error procesando WIP directo: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+        
+        return False, error_msg, {}
+
+def is_wip_table_direct_processing(table_name):
+    """
+    Verifica si una tabla debe usar procesamiento directo
+    """
+    return table_name.lower() == "wip"
+
+def process_finishgood_direct(db_path):
+    """
+    Procesador DIRECTO para FINISHGOOD usando tu código exacto - VERSIÓN CORREGIDA
+    """
+    import pandas as pd
+    import sqlite3
+    import os
+    from datetime import datetime
+    
+    print(f"🎯 PROCESAMIENTO DIRECTO DE FINISHGOOD - Tu código exacto")
+    
+    try:
+        # PASO 1: Tu código exacto de lectura
+        print(f"📖 Leyendo archivo IN539.txt...")
+        df = pd.read_fwf(
+            r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\IN 5 39\IN539.txt",
+            widths=[9,31,21,10,3,3,10,9,9,14,14,15,20,15,10,17,10,10], 
+            header=3
+        )
+        print(f"   ✅ Archivo leído: {len(df)} filas, {len(df.columns)} columnas")
+        
+        # PASO 2: Tu procesamiento exacto
+        print(f"🔧 Aplicando tu lógica de limpieza EXACTA...")
+        
+        df.drop([0], axis=0, inplace=True)
+        print(f"   🗑️ Eliminada fila 0: {len(df)} filas restantes")
+        
+        df = df.fillna('')
+        print(f"   🔧 NaN rellenados")
+        
+        df = df.loc[df['Entity']!='End-of-Re']
+        print(f"   🔽 Filtro Entity != End-of-Re: {len(df)} filas")
+        
+        df = df.loc[df['Entity']!='']
+        print(f"   🔽 Filtro Entity != vacío: {len(df)} filas")
+        
+        # PASO 3: Tu renombrado exacto (SIN CAMBIOS)
+        print(f"🔄 Aplicando tu renombrado exacto...")
+        df = df.rename(columns = {
+            'Item-No':'ItemNo',
+            'Due Date':'DueDate',
+            'T-Date':'TDate',
+            'Order No':'OrderNo',
+            'Open Qty':'OpenQty',
+            'Std Cost':'StdCost',
+            'L O T':'LOT',
+            'Qty     Ex':'Qty',
+            'tended Cost':'ExtCost',
+            'Std Labor':'StdLabor',
+            'Std Matl':'StdMatl',
+            'Unnamed: 16':'Entity',
+            'Unnamed: 17':'Project'
+        })
+        print(f"   📋 Todas las columnas después del rename: {list(df.columns)}")
+        
+        # PASO 4: NUEVO - Seleccionar SOLO las columnas que están en la tabla SQL
+        print(f"🔍 Seleccionando solo columnas esperadas en la tabla...")
+        expected_columns = [
+            'ItemNo', 'Description', 'DueDate', 'TDate', 'UM', 'Wh',
+            'OrderNo', 'OpenQty', 'StdCost', 'LOT', 'Qty', 'ExtCost',
+            'BIN', 'StdLabor', 'StdMatl', 'Entity', 'Project'
+        ]
+        
+        # Verificar qué columnas están disponibles
+        available_columns = [col for col in expected_columns if col in df.columns]
+        missing_columns = [col for col in expected_columns if col not in df.columns]
+        extra_columns = [col for col in df.columns if col not in expected_columns]
+        
+        print(f"   ✅ Columnas disponibles: {available_columns}")
+        if missing_columns:
+            print(f"   ⚠️ Columnas faltantes: {missing_columns}")
+        if extra_columns:
+            print(f"   ℹ️ Columnas extra (se ignorarán): {extra_columns}")
+        
+        # Seleccionar solo las columnas disponibles que están en la tabla
+        finishgood = df[available_columns].copy()
+        print(f"   📊 DataFrame final: {len(finishgood)} filas, {len(finishgood.columns)} columnas")
+        print(f"   📋 Columnas finales: {list(finishgood.columns)}")
+        
+        # PASO 5: Conectar a base de datos
+        print(f"💾 Conectando a base de datos...")
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # PASO 6: Verificar si tabla existe
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='finishgood'")
+        table_exists = cursor.fetchone() is not None
+        
+        if table_exists:
+            print(f"   🗑️ Tabla FINISHGOOD existe - eliminando contenido...")
+            cursor.execute("DELETE FROM finishgood")
+            print(f"   ✅ Contenido eliminado")
+        else:
+            print(f"   🆕 Tabla FINISHGOOD no existe - creando...")
+            create_table_sql = """CREATE TABLE finishgood(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ItemNo TEXT,
+                Description TEXT,
+                DueDate TEXT,
+                TDate TEXT,
+                UM TEXT,
+                Wh TEXT,
+                OrderNo TEXT,
+                OpenQty TEXT,
+                StdCost TEXT,
+                LOT TEXT,
+                Qty TEXT,
+                ExtCost TEXT,
+                BIN TEXT,
+                StdLabor TEXT,
+                StdMatl TEXT,
+                Entity TEXT,
+                Project TEXT
+            )"""
+            cursor.execute(create_table_sql)
+            print(f"   ✅ Tabla creada")
+        
+        # PASO 7: Insertar datos (usando finishgood, no df)
+        print(f"💾 Insertando {len(finishgood)} registros...")
+        finishgood.to_sql('finishgood', conn, if_exists='append', index=False)
+        
+        # PASO 8: Verificar inserción
+        cursor.execute("SELECT COUNT(*) FROM finishgood")
+        final_count = cursor.fetchone()[0]
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"   ✅ Inserción completada: {final_count} registros en BD")
+        
+        # PASO 9: Mostrar muestra de datos insertados
+        if not finishgood.empty:
+            print(f"📄 Muestra de datos procesados:")
+            for i in range(min(5, len(finishgood))):
+                itemno = finishgood.iloc[i]['ItemNo'] if 'ItemNo' in finishgood.columns else 'N/A'
+                description = str(finishgood.iloc[i]['Description'])[:30] + "..." if 'Description' in finishgood.columns and len(str(finishgood.iloc[i]['Description'])) > 30 else finishgood.iloc[i]['Description'] if 'Description' in finishgood.columns else 'N/A'
+                entity = finishgood.iloc[i]['Entity'] if 'Entity' in finishgood.columns else 'N/A'
+                print(f"   Fila {i+1}: ItemNo='{itemno}', Description='{description}', Entity='{entity}'")
+        
+        # PASO 10: Estadísticas finales
+        stats = {
+            "success": True,
+            "records_processed": len(finishgood),
+            "records_in_db": final_count,
+            "table_recreated": not table_exists,
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "columns_used": available_columns,
+            "columns_ignored": extra_columns
+        }
+        
+        return True, f"FINISHGOOD procesada exitosamente - {final_count} registros", stats
+        
+    except Exception as e:
+        error_msg = f"Error procesando FINISHGOOD directo: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+        
+        return False, error_msg, {}
 
 
 
-
-
-
-
-
-
-
-
-
-
-
+def is_finishgood_table_direct_processing(table_name):
+    """
+    Verifica si una tabla debe usar procesamiento directo
+    """
+    return table_name.lower() == "finishgood"
 
 
 if __name__ == "__main__":

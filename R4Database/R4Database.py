@@ -105,11 +105,84 @@ class SimpleUpdater(QThread):
         }
     
     def update_table(self):
-        """Actualiza la tabla"""
+        """Actualiza la tabla - CON DETECCIÓN WIP Y FINISHGOOD DIRECTO"""
+        
+        # 🎯 PROCESAMIENTO DIRECTO PARA WIP
+        if self.table_name.lower() == "wip":
+            self.progress_update.emit(f"🎯 Detectada tabla WIP - usando procesamiento DIRECTO...")
+            
+            try:
+                from config_tables import process_wip_direct
+                
+                self.progress_update.emit(f"🔧 Ejecutando tu código exacto para WIP...")
+                success, message, stats = process_wip_direct(self.db_path)
+                
+                if success:
+                    # Actualizar tracking para WIP
+                    self.progress_update.emit(f"📝 Actualizando tracking de WIP...")
+                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    tracking_data = self.load_tracking()
+                    tracking_data[self.table_name] = {
+                        "file_path": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\PR 5 19\PR519.txt",
+                        "last_hash": "direct_processing_wip",
+                        "last_modified": now,
+                        "last_updated": now,
+                        "records_count": stats.get("records_in_db", 0),
+                        "detected_format": "direct_wip_processing",
+                        "processing_type": "direct"
+                    }
+                    self.save_tracking(tracking_data)
+                    self.progress_update.emit(f"✅ WIP procesada con tu código directo!")
+                
+                return success, message, stats
+                
+            except ImportError:
+                return False, "Error: No se encontró la función process_wip_direct en config_tables.py", {}
+            except Exception as e:
+                return False, f"Error en procesamiento directo WIP: {str(e)}", {}
+        
+        # 🎯 PROCESAMIENTO DIRECTO PARA FINISHGOOD
+        elif self.table_name.lower() == "finishgood":
+            self.progress_update.emit(f"🎯 Detectada tabla FINISHGOOD - usando procesamiento DIRECTO...")
+            
+            try:
+                from config_tables import process_finishgood_direct
+                
+                self.progress_update.emit(f"🔧 Ejecutando tu código exacto para FINISHGOOD...")
+                success, message, stats = process_finishgood_direct(self.db_path)
+                
+                if success:
+                    # Actualizar tracking para FINISHGOOD
+                    self.progress_update.emit(f"📝 Actualizando tracking de FINISHGOOD...")
+                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    tracking_data = self.load_tracking()
+                    tracking_data[self.table_name] = {
+                        "file_path": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\IN 5 39\IN539.txt",
+                        "last_hash": "direct_processing_finishgood",
+                        "last_modified": now,
+                        "last_updated": now,
+                        "records_count": stats.get("records_in_db", 0),
+                        "detected_format": "direct_finishgood_processing",
+                        "processing_type": "direct"
+                    }
+                    self.save_tracking(tracking_data)
+                    self.progress_update.emit(f"✅ FINISHGOOD procesada con tu código directo!")
+                
+                return success, message, stats
+                
+            except ImportError:
+                return False, "Error: No se encontró la función process_finishgood_direct en config_tables.py", {}
+            except Exception as e:
+                return False, f"Error en procesamiento directo FINISHGOOD: {str(e)}", {}
+        
+        # 📊 PROCESAMIENTO ESTÁNDAR PARA OTRAS TABLAS
         config = TABLES_CONFIG.get(self.table_name)
         if not config:
             return False, f"Configuración no encontrada para {self.table_name}", {}
         
+        self.progress_update.emit(f"📊 Procesamiento estándar para {self.table_name}...")
         self.progress_update.emit(f"Verificando cambios en {self.table_name}...")
         
         has_changed, change_info = self.file_has_changed(config)
@@ -162,7 +235,8 @@ class SimpleUpdater(QThread):
                 "last_modified": change_info["current_modified"],
                 "last_updated": now,
                 "records_count": len(df_processed),
-                "detected_format": detected_format
+                "detected_format": detected_format,
+                "processing_type": "standard"
             }
             self.save_tracking(tracking_data)
             
@@ -178,11 +252,12 @@ class SimpleUpdater(QThread):
             conn.close()
 
 class BulkUpdater(QThread):
-    """Actualizador masivo para todas las tablas"""
+    """Actualizador masivo para todas las tablas - VERSIÓN MEJORADA"""
     progress_update = pyqtSignal(str)
     table_finished = pyqtSignal(str, bool, str, dict)  # table_name, success, message, stats
     all_finished = pyqtSignal(dict)  # resumen final
     backup_finished = pyqtSignal(bool, str, str)  # success, backup_path, message
+    
     def __init__(self, force_update=False):
         super().__init__()
         self.force_update = force_update
@@ -223,8 +298,148 @@ class BulkUpdater(QThread):
         with open(self.tracking_file, 'w') as f:
             json.dump(data, f, indent=2)
     
+    def update_single_table(self, table_name, config):
+        """Actualiza una sola tabla (método interno) - VERSIÓN CORREGIDA CON LIMPIEZA FORZADA"""
+        # Verificar archivo
+        file_path = config["source_file"]
+        if not os.path.exists(file_path):
+            return False, "Archivo no encontrado", {}
+        
+        # Verificar cambios (solo si no es forzar actualización)
+        if not self.force_update:
+            tracking_data = self.load_tracking()
+            table_data = tracking_data.get(table_name, {})
+            
+            current_hash = self.get_file_hash(file_path)
+            stored_hash = table_data.get("last_hash", "")
+            
+            has_changed = current_hash != stored_hash
+            
+            if not has_changed:
+                return False, "No se detectaron cambios en el archivo", {
+                    "last_updated": table_data.get("last_updated", "N/A"),
+                    "records_count": table_data.get("records_count", 0)
+                }
+        
+        # Procesar archivo
+        df = read_file_data(file_path, config)
+        detected_format = detect_column_format(file_path, config)
+        df_processed = process_dataframe_columns(df, config, detected_format)
+        
+        # Actualizar BD
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        conn = sqlite3.connect(self.db_path)
+        
+        try:
+            # ✅ LIMPIEZA DIRECTA para WIP y FINISHGOOD con SQL SEGURO
+            if table_name in ['wip', 'finishgood']:
+                self.progress_update.emit(f"   🔥 Aplicando limpieza FORZADA para {table_name}")
+                
+                cursor = conn.cursor()
+                
+                # PASO 1: Eliminar tabla completamente de forma segura
+                table_to_drop = config['table_name']
+                try:
+                    cursor.execute(f"DROP TABLE IF EXISTS {table_to_drop}")
+                    self.progress_update.emit(f"   🗑️ Tabla {table_to_drop} eliminada")
+                except Exception as e:
+                    self.progress_update.emit(f"   ⚠️ Error eliminando tabla: {str(e)}")
+                
+                # PASO 2: Crear tabla nueva con SQL limpio
+                if table_name == 'wip':
+                    create_sql = """CREATE TABLE wip(
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        WONo TEXT,
+                        ItemNo TEXT,
+                        PlanType TEXT,
+                        Description TEXT,
+                        DueDate TEXT,
+                        ReqQty TEXT,
+                        OpenQty TEXT,
+                        QtyComp TEXT,
+                        IssueWip TEXT,
+                        FullBom TEXT,
+                        PercentCom TEXT,
+                        Full_Labor TEXT,
+                        Curr_Labor TEXT
+                    )"""
+                elif table_name == 'finishgood':
+                    create_sql = """CREATE TABLE finishgood(
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ItemNo TEXT,
+                        Description TEXT,
+                        DueDate TEXT,
+                        TDate TEXT,
+                        UM TEXT,
+                        ML TEXT,
+                        OrderNo TEXT,
+                        OpenQty TEXT,
+                        StdCost TEXT,
+                        LOT TEXT,
+                        Qty TEXT,
+                        ExtCost TEXT,
+                        Bin TEXT,
+                        StdLabor TEXT,
+                        StdMatl TEXT,
+                        Unnamed_15 TEXT,
+                        Entity TEXT,
+                        Project TEXT
+                    )"""
+                
+                cursor.execute(create_sql)
+                self.progress_update.emit(f"   ✅ Tabla {table_to_drop} recreada exitosamente")
+                
+            else:
+                # Método normal para otras tablas
+                cursor = conn.cursor()
+                cursor.execute(config["create_table_sql"])
+                cursor.execute(f"DELETE FROM {config['table_name']}")
+            
+            # PASO 3: Insertar datos procesados
+            self.progress_update.emit(f"   💾 Insertando {len(df_processed)} registros en {table_name}")
+            df_processed.to_sql(config['table_name'], conn, if_exists='append', index=False)
+            conn.commit()
+            
+            # PASO 4: Verificar inserción
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT COUNT(*) FROM {config['table_name']}")
+            final_count = cursor.fetchone()[0]
+            
+            self.progress_update.emit(f"   ✅ Verificación {table_name}: {final_count} registros en BD")
+            
+            # PASO 5: Actualizar tracking
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            current_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime("%Y-%m-%d %H:%M:%S")
+            current_hash = self.get_file_hash(file_path)
+            
+            tracking_data = self.load_tracking()
+            tracking_data[table_name] = {
+                "file_path": file_path,
+                "last_hash": current_hash,
+                "last_modified": current_modified,
+                "last_updated": now,
+                "records_count": final_count,
+                "detected_format": detected_format,
+                "forced_recreation": table_name in ['wip', 'finishgood']
+            }
+            self.save_tracking(tracking_data)
+            
+            return True, f"Actualizada exitosamente", {
+                "records_count": final_count,
+                "last_updated": now,
+                "detected_format": detected_format,
+                "forced_recreation": table_name in ['wip', 'finishgood']
+            }
+            
+        except Exception as e:
+            self.progress_update.emit(f"   ❌ ERROR en {table_name}: {str(e)}")
+            conn.rollback()
+            raise e
+        finally:
+            conn.close()
+
     def update_all_tables(self):
-        """Actualiza todas las tablas configuradas"""
+        """Actualiza todas las tablas configuradas - MÉTODO IGUAL AL ORIGINAL"""
         total_tables = len(TABLES_CONFIG)
         updated_count = 0
         skipped_count = 0
@@ -250,7 +465,9 @@ class BulkUpdater(QThread):
                 
                 if success:
                     updated_count += 1
-                    self.progress_update.emit(f"✅ {table_name}: {message}")
+                    recreation_used = stats.get("recreation_used", False)
+                    recreation_msg = " (RECREADA)" if recreation_used else ""
+                    self.progress_update.emit(f"✅ {table_name}: {message}{recreation_msg}")
                 else:
                     if "No se detectaron cambios" in message:
                         skipped_count += 1
@@ -283,7 +500,7 @@ class BulkUpdater(QThread):
                 
                 self.table_finished.emit(table_name, False, error_msg, {})
         
-        # Resumen final
+        # Resumen final (igual que antes)
         total_records = sum(r["stats"].get("records_count", 0) for r in self.results.values() if r["success"])
         
         summary = {
@@ -300,9 +517,8 @@ class BulkUpdater(QThread):
             f"✅ {updated_count} actualizadas, ℹ️ {skipped_count} sin cambios, ❌ {error_count} errores"
         )
         
-
-        """*** NUEVO: CREAR BACKUP AUTOMÁTICO ***"""
-        if updated_count > 0:  # Solo crear backup si hubo actualizaciones
+        # Backup automático (igual que antes)
+        if updated_count > 0:
             self.progress_update.emit("💾 Creando backup automático de la base de datos...")
             
             try:
@@ -326,72 +542,7 @@ class BulkUpdater(QThread):
             self.progress_update.emit("ℹ️ No se creó backup - no hubo actualizaciones")
             self.backup_finished.emit(False, "", "No se requiere backup")
 
-
         self.all_finished.emit(summary)
-    
-    def update_single_table(self, table_name, config):
-        """Actualiza una sola tabla (método interno)"""
-        # Verificar archivo
-        file_path = config["source_file"]
-        if not os.path.exists(file_path):
-            return False, "Archivo no encontrado", {}
-        
-        # Verificar cambios
-        tracking_data = self.load_tracking()
-        table_data = tracking_data.get(table_name, {})
-        
-        current_hash = self.get_file_hash(file_path)
-        stored_hash = table_data.get("last_hash", "")
-        
-        current_modified = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime("%Y-%m-%d %H:%M:%S")
-        
-        has_changed = current_hash != stored_hash
-        
-        if not has_changed and not self.force_update:
-            return False, "No se detectaron cambios en el archivo", {
-                "last_updated": table_data.get("last_updated", "N/A"),
-                "records_count": table_data.get("records_count", 0)
-            }
-        
-        # Procesar archivo
-        df = read_file_data(file_path, config)
-        detected_format = detect_column_format(file_path, config)
-        df_processed = process_dataframe_columns(df, config, detected_format)
-        
-        # Actualizar BD
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        try:
-            # Crear tabla
-            cursor.execute(config["create_table_sql"])
-            
-            # Limpiar y insertar
-            cursor.execute(f"DELETE FROM {config['table_name']}")
-            df_processed.to_sql(config['table_name'], conn, if_exists='append', index=False)
-            conn.commit()
-            
-            # Actualizar tracking
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            tracking_data[table_name] = {
-                "file_path": file_path,
-                "last_hash": current_hash,
-                "last_modified": current_modified,
-                "last_updated": now,
-                "records_count": len(df_processed),
-                "detected_format": detected_format
-            }
-            self.save_tracking(tracking_data)
-            
-            return True, f"Actualizada exitosamente", {
-                "records_count": len(df_processed),
-                "last_updated": now,
-                "detected_format": detected_format
-            }
-            
-        finally:
-            conn.close()
 
 class InvoicedUpdater(QThread):
     """Thread especializado para actualización de tabla invoiced"""
