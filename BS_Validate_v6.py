@@ -687,7 +687,7 @@ class BackScheduleAnalyzer:
                     
             # Query para WOInquiry con filtro Srt y OpnQ > 0
             wo_query = """
-            SELECT WONo, SO_FCST, Sub, ItemNumber, Description as WO_Description, 
+            SELECT Entity,WONo, SO_FCST, Sub, ItemNumber, Description as WO_Description, 
                 AC, DueDt, CompDt, CreateDt, St as WO_Status, OpnQ, Srt, Plnr, PlanType
             FROM WOInquiry
             WHERE Srt IN ('GF', 'GFA', 'KZ') AND OpnQ > 0
@@ -709,6 +709,12 @@ class BackScheduleAnalyzer:
             print("🔄 Ejecutando query PR561...")
             pr561_df = pd.read_sql_query(pr561_query, conn)
             print(f"✅ PR561 cargado: {len(pr561_df)} registros")
+            
+            # Convertir fechas en PR561 si existen
+            if 'ReqDate' in pr561_df.columns:
+                pr561_df['ReqDate'] = pd.to_datetime(pr561_df['ReqDate'], errors='coerce')
+                pr561_df['ReqDate'] = pr561_df['ReqDate'].apply(lambda x: x.to_pydatetime() if pd.notna(x) else None)
+            
             conn.close()
             
             print("🔄 Agrupando materiales por WO...")
@@ -735,57 +741,128 @@ class BackScheduleAnalyzer:
             print(f"✅ Merge completado: {len(merged_df)} registros")
             
             print("🔄 Procesando campos...")
-            # Identificar WO sin materiales (Materials_Count es NaN)
-            merged_df['Has_Materials'] = merged_df['Materials_Count'].notna()
+            # Identificar WO que no requieren materiales - CONDICIONES EXPANDIDAS
+            merged_df['No_Materials_Required'] = (
+                # Condición 1: Entity EZ4319 + ItemNumber comienza con 197-
+                ((merged_df['ItemNumber'].str.startswith('197-', na=False)) & 
+                (merged_df['Entity'] == 'EZ4319')) |
+                # Condición 2: Entity EZ4200 + ItemNumber comienza con 197- + Status F
+                ((merged_df['ItemNumber'].str.startswith('197-', na=False)) & 
+                (merged_df['Entity'] == 'EZ4200') & 
+                (merged_df['WO_Status'] == 'F'))
+            )
+            
+            # Identificar WO sin materiales - EXCLUYENDO las que no requieren materiales
+            merged_df['Has_Materials'] = (
+                merged_df['Materials_Count'].notna() | 
+                merged_df['No_Materials_Required']
+            )
+            
             merged_df['Materials_Count'] = merged_df['Materials_Count'].fillna(0).astype(int)
             merged_df['Total_ReqQty'] = merged_df['Total_ReqQty'].fillna(0)
             merged_df['Total_QtyIssue'] = merged_df['Total_QtyIssue'].fillna(0)
             merged_df['Total_QtyPending'] = merged_df['Total_QtyPending'].fillna(0)
             merged_df['Total_ValRequired'] = merged_df['Total_ValRequired'].fillna(0)
             
-            # Categorizar WO
-            merged_df['WO_Category'] = merged_df.apply(
-                lambda row: 'Con Materiales' if row['Has_Materials'] 
-                        else 'Sin Materiales', axis=1
-            )
+            # Categorizar WO - ACTUALIZADO con más detalle
+            def categorize_wo(row):
+                if row['Materials_Count'] > 0:
+                    return 'Con Materiales'
+                elif row['ItemNumber'] and row['ItemNumber'].startswith('197-'):
+                    if row['Entity'] == 'EZ4319':
+                        return 'No Requiere Materiales (EZ4319-197-)'
+                    elif row['Entity'] == 'EZ4200' and row['WO_Status'] == 'F':
+                        return 'No Requiere Materiales (EZ4200-197-F)'
+                    else:
+                        return 'Sin Materiales'
+                else:
+                    return 'Sin Materiales'
+            
+            merged_df['WO_Category'] = merged_df.apply(categorize_wo, axis=1)
             
             print("🔄 Procesando fechas...")
-            # Procesar fechas
+            # Procesar fechas - CONVERSIÓN A TIPOS PYTHON NATIVOS
             merged_df['DueDt'] = pd.to_datetime(merged_df['DueDt'], errors='coerce')
             merged_df['CompDt'] = pd.to_datetime(merged_df['CompDt'], errors='coerce')
             merged_df['CreateDt'] = pd.to_datetime(merged_df['CreateDt'], errors='coerce')
             
+            # Convertir fechas NaT a None y datetime64 a datetime Python
+            for col in ['DueDt', 'CompDt', 'CreateDt']:
+                merged_df[col] = merged_df[col].apply(lambda x: x.to_pydatetime() if pd.notna(x) else None)
+            
             print("🔄 Calculando métricas generales...")
-            # Métricas generales
-            total_wo = len(merged_df)
-            wo_with_materials = int(merged_df['Has_Materials'].sum())
-            wo_without_materials = total_wo - wo_with_materials
-            materials_pct = (wo_with_materials / total_wo * 100) if total_wo > 0 else 0
+            # Métricas generales - USANDO LÓGICA CONSISTENTE Y CONVERSIÓN A PYTHON NATIVO
+            total_wo = int(len(merged_df))
+            wo_with_materials = int((merged_df['Materials_Count'] > 0).sum())
+            wo_no_req_materials = int(merged_df['No_Materials_Required'].sum())
+            # CORREGIDO: Usar la misma lógica que usaremos para Srt
+            wo_without_materials = int(((merged_df['Materials_Count'] == 0) & 
+                                    (~merged_df['No_Materials_Required'])).sum())
+            materials_pct = float((wo_with_materials / total_wo * 100) if total_wo > 0 else 0)
+            
+            # Métricas detalladas de no requieren materiales
+            wo_no_req_ez4319 = int(((merged_df['ItemNumber'].str.startswith('197-', na=False)) & 
+                                (merged_df['Entity'] == 'EZ4319')).sum())
+            wo_no_req_ez4200_f = int(((merged_df['ItemNumber'].str.startswith('197-', na=False)) & 
+                                    (merged_df['Entity'] == 'EZ4200') & 
+                                    (merged_df['WO_Status'] == 'F')).sum())
             
             print(f"📊 Métricas básicas calculadas:")
             print(f"   Total WO: {total_wo}")
             print(f"   Con materiales: {wo_with_materials}")
-            print(f"   Sin materiales: {wo_without_materials}")
+            print(f"   No requieren materiales: {wo_no_req_materials}")
+            print(f"     - EZ4319 + 197-: {wo_no_req_ez4319}")
+            print(f"     - EZ4200 + 197- + F: {wo_no_req_ez4200_f}")
+            print(f"   Sin materiales (problema real): {wo_without_materials}")
             print(f"   % con materiales: {materials_pct}")
+            print(f"   🔍 VERIFICACIÓN: {wo_with_materials} + {wo_without_materials} + {wo_no_req_materials} = {wo_with_materials + wo_without_materials + wo_no_req_materials} (debe ser {total_wo})")
             
             print("🔄 Calculando métricas por Srt...")
-            # Métricas por tipo Srt - MÉTODO CORREGIDO
+            # Métricas por tipo Srt - USANDO LÓGICA CONSISTENTE
             srt_totals = merged_df['Srt'].value_counts()
             
-            # Calcular sin materiales por Srt de forma directa y robusta
-            srt_gf_total = len(merged_df[merged_df['Srt'] == 'GF'])
-            srt_gfa_total = len(merged_df[merged_df['Srt'] == 'GFA'])
-            srt_kz_total = len(merged_df[merged_df['Srt'] == 'KZ'])
+            # Calcular totales por Srt - CONVERSIÓN A PYTHON NATIVO
+            srt_gf_total = int(len(merged_df[merged_df['Srt'] == 'GF']))
+            srt_gfa_total = int(len(merged_df[merged_df['Srt'] == 'GFA']))
+            srt_kz_total = int(len(merged_df[merged_df['Srt'] == 'KZ']))
             
-            srt_gf_without = len(merged_df[(merged_df['Srt'] == 'GF') & (~merged_df['Has_Materials'])])
-            srt_gfa_without = len(merged_df[(merged_df['Srt'] == 'GFA') & (~merged_df['Has_Materials'])])
-            srt_kz_without = len(merged_df[(merged_df['Srt'] == 'KZ') & (~merged_df['Has_Materials'])])
+            # CORREGIDO: Usar la misma lógica que el cálculo general
+            srt_gf_without = int(len(merged_df[
+                (merged_df['Srt'] == 'GF') & 
+                (merged_df['Materials_Count'] == 0) & 
+                (~merged_df['No_Materials_Required'])
+            ]))
+            srt_gfa_without = int(len(merged_df[
+                (merged_df['Srt'] == 'GFA') & 
+                (merged_df['Materials_Count'] == 0) & 
+                (~merged_df['No_Materials_Required'])
+            ]))
+            srt_kz_without = int(len(merged_df[
+                (merged_df['Srt'] == 'KZ') & 
+                (merged_df['Materials_Count'] == 0) & 
+                (~merged_df['No_Materials_Required'])
+            ]))
+            
+            # Agregar conteos informativos para las WO que no requieren materiales
+            srt_gf_no_req = int(len(merged_df[
+                (merged_df['Srt'] == 'GF') & 
+                (merged_df['No_Materials_Required'])
+            ]))
+            srt_gfa_no_req = int(len(merged_df[
+                (merged_df['Srt'] == 'GFA') & 
+                (merged_df['No_Materials_Required'])
+            ]))
+            srt_kz_no_req = int(len(merged_df[
+                (merged_df['Srt'] == 'KZ') & 
+                (merged_df['No_Materials_Required'])
+            ]))
             
             print(f"📊 Análisis Srt CORREGIDO:")
-            print(f"   GF: {srt_gf_total} total, {srt_gf_without} sin materiales")
-            print(f"   GFA: {srt_gfa_total} total, {srt_gfa_without} sin materiales") 
-            print(f"   KZ: {srt_kz_total} total, {srt_kz_without} sin materiales")
-            print(f"   SUMA sin materiales: {srt_gf_without + srt_gfa_without + srt_kz_without}")
+            print(f"   GF: {srt_gf_total} total, {srt_gf_without} sin materiales, {srt_gf_no_req} no requieren")
+            print(f"   GFA: {srt_gfa_total} total, {srt_gfa_without} sin materiales, {srt_gfa_no_req} no requieren") 
+            print(f"   KZ: {srt_kz_total} total, {srt_kz_without} sin materiales, {srt_kz_no_req} no requieren")
+            print(f"   SUMA sin materiales: {srt_gf_without + srt_gfa_without + srt_kz_without} (debe coincidir con {wo_without_materials})")
+            print(f"   SUMA no requieren: {srt_gf_no_req + srt_gfa_no_req + srt_kz_no_req}")
             
             print("🔄 Calculando métricas por WO_Status...")
             # Métricas por WO_Status
@@ -794,25 +871,38 @@ class BackScheduleAnalyzer:
             print(f"📊 Análisis WO_Status:")
             print(f"   status_totals: {dict(status_totals)}")
             
-            # Crear métricas dinámicas por cada status
+            # Crear métricas dinámicas por cada status - USANDO LÓGICA CONSISTENTE Y CONVERSIÓN
             status_metrics = {}
             for status in status_totals.index:
-                total_for_status = len(merged_df[merged_df['WO_Status'] == status])
-                without_for_status = len(merged_df[(merged_df['WO_Status'] == status) & (~merged_df['Has_Materials'])])
-                with_for_status = total_for_status - without_for_status
+                total_for_status = int(len(merged_df[merged_df['WO_Status'] == status]))
+                # CORREGIDO: Usar la misma lógica consistente
+                without_for_status = int(len(merged_df[
+                    (merged_df['WO_Status'] == status) & 
+                    (merged_df['Materials_Count'] == 0) & 
+                    (~merged_df['No_Materials_Required'])
+                ]))
+                with_for_status = int(len(merged_df[
+                    (merged_df['WO_Status'] == status) & 
+                    (merged_df['Materials_Count'] > 0)
+                ]))
+                no_req_for_status = int(len(merged_df[
+                    (merged_df['WO_Status'] == status) & 
+                    (merged_df['No_Materials_Required'])
+                ]))
                 
                 status_metrics[f'status_{status}_total'] = total_for_status
                 status_metrics[f'status_{status}_with'] = with_for_status
                 status_metrics[f'status_{status}_without'] = without_for_status
-                status_metrics[f'status_{status}_without_pct'] = round(100 * without_for_status / max(total_for_status, 1), 1)
+                status_metrics[f'status_{status}_no_req'] = no_req_for_status
+                status_metrics[f'status_{status}_without_pct'] = round(float(100 * without_for_status / max(total_for_status, 1)), 1)
                 
-                print(f"   Status {status}: {total_for_status} total, {without_for_status} sin materiales ({100 * without_for_status / max(total_for_status, 1):.1f}%)")
+                print(f"   Status {status}: {total_for_status} total, {without_for_status} sin materiales, {no_req_for_status} no requieren ({100 * without_for_status / max(total_for_status, 1):.1f}%)")
 
             print(f"📊 Métricas por Status creadas: {len(status_metrics)} métricas")
             
             print("🔄 Calculando valores promedio...")
             # Análisis de valor para WO con materiales - CORREGIDO
-            wo_with_mat = merged_df[merged_df['Has_Materials']]
+            wo_with_mat = merged_df[merged_df['Materials_Count'] > 0]
             
             print(f"   WO con materiales: {len(wo_with_mat)}")
             
@@ -836,7 +926,27 @@ class BackScheduleAnalyzer:
                 total_value_required = 0.0
             
             print("🔄 Construyendo diccionario de métricas...")
-            # Guardar resultados
+            # Guardar resultados - CONVERTIR DATAFRAME A TIPOS COMPATIBLES
+            print("   🔄 Convirtiendo DataFrame a tipos compatibles...")
+            
+            # Convertir columnas numéricas numpy a tipos Python nativos
+            numeric_columns = ['Materials_Count', 'Total_ReqQty', 'Total_QtyIssue', 'Total_QtyPending', 'Total_ValRequired', 'OpnQ']
+            for col in numeric_columns:
+                if col in merged_df.columns:
+                    merged_df[col] = merged_df[col].astype('float64').apply(lambda x: float(x) if pd.notna(x) else 0.0)
+            
+            # Convertir columnas booleanas
+            bool_columns = ['Has_Materials', 'No_Materials_Required']
+            for col in bool_columns:
+                if col in merged_df.columns:
+                    merged_df[col] = merged_df[col].astype(bool)
+            
+            # Convertir columnas de texto a string Python nativos
+            text_columns = ['Entity', 'WONo', 'ItemNumber', 'WO_Description', 'WO_Status', 'Srt', 'WO_Category', 'PR_WONo']
+            for col in text_columns:
+                if col in merged_df.columns:
+                    merged_df[col] = merged_df[col].astype('string').apply(lambda x: str(x) if pd.notna(x) else "")
+            
             self.wo_materials_data = merged_df
             self.wo_materials_raw = pr561_df
             
@@ -848,14 +958,18 @@ class BackScheduleAnalyzer:
                 metrics['total_wo'] = total_wo
                 metrics['wo_with_materials'] = wo_with_materials
                 metrics['wo_without_materials'] = wo_without_materials
+                metrics['wo_no_req_materials'] = wo_no_req_materials
+                metrics['wo_no_req_ez4319'] = wo_no_req_ez4319
+                metrics['wo_no_req_ez4200_f'] = wo_no_req_ez4200_f
                 
                 print("   ✅ Agregando porcentajes...")
-                metrics['materials_pct'] = round(materials_pct, 2)
-                metrics['without_materials_pct'] = round(100 - materials_pct, 2)
+                metrics['materials_pct'] = round(float(materials_pct), 2)
+                metrics['without_materials_pct'] = round(float(100 * wo_without_materials / total_wo), 2) if total_wo > 0 else 0.0
+                metrics['no_req_materials_pct'] = round(float(100 * wo_no_req_materials / total_wo), 2) if total_wo > 0 else 0.0
                 
                 print("   ✅ Agregando promedios...")
-                metrics['avg_materials_per_wo'] = round(avg_materials_per_wo, 1)
-                metrics['total_value_required'] = round(total_value_required, 2)
+                metrics['avg_materials_per_wo'] = round(float(avg_materials_per_wo), 1)
+                metrics['total_value_required'] = round(float(total_value_required), 2)
                 
                 print("   ✅ Agregando métricas Srt CORREGIDAS...")
                 metrics['srt_gf_total'] = srt_gf_total
@@ -864,6 +978,9 @@ class BackScheduleAnalyzer:
                 metrics['srt_gf_without'] = srt_gf_without
                 metrics['srt_gfa_without'] = srt_gfa_without
                 metrics['srt_kz_without'] = srt_kz_without
+                metrics['srt_gf_no_req'] = srt_gf_no_req
+                metrics['srt_gfa_no_req'] = srt_gfa_no_req
+                metrics['srt_kz_no_req'] = srt_kz_no_req
                 
                 print("   ✅ Agregando métricas de Status...")
                 # Agregar métricas de status
@@ -876,13 +993,19 @@ class BackScheduleAnalyzer:
             
             self.wo_materials_metrics = metrics
             
-            # VERIFICACIÓN FINAL
+            # VERIFICACIÓN FINAL MEJORADA
             print(f"\n🔍 VERIFICACIÓN FINAL:")
             print(f"   📊 Total WO: {total_wo}")
             print(f"   ✅ Con materiales: {wo_with_materials} ({materials_pct:.1f}%)")
-            print(f"   ❌ Sin materiales: {wo_without_materials} ({100-materials_pct:.1f}%)")
+            print(f"   ❌ Sin materiales (problema real): {wo_without_materials} ({100 * wo_without_materials / total_wo:.1f}%)")
+            print(f"   🔧 No requieren materiales: {wo_no_req_materials} ({100 * wo_no_req_materials / total_wo:.1f}%)")
+            print(f"     - EZ4319 + 197-: {wo_no_req_ez4319}")
+            print(f"     - EZ4200 + 197- + F: {wo_no_req_ez4200_f}")
             print(f"   🔧 Por Srt sin materiales: GF={srt_gf_without}, GFA={srt_gfa_without}, KZ={srt_kz_without}")
-            print(f"   🧮 Suma Srt: {srt_gf_without + srt_gfa_without + srt_kz_without} (debe coincidir con {wo_without_materials})")
+            print(f"   🔧 Por Srt no requieren: GF={srt_gf_no_req}, GFA={srt_gfa_no_req}, KZ={srt_kz_no_req}")
+            print(f"   🧮 Suma sin materiales: {srt_gf_without + srt_gfa_without + srt_kz_without} (debe coincidir con {wo_without_materials})")
+            print(f"   🧮 Suma no requieren: {srt_gf_no_req + srt_gfa_no_req + srt_kz_no_req} (debe coincidir con {wo_no_req_materials})")
+            print(f"   ✅ TOTAL VERIFICACIÓN: {wo_with_materials} + {wo_without_materials} + {wo_no_req_materials} = {wo_with_materials + wo_without_materials + wo_no_req_materials} (debe ser {total_wo})")
             
             return True
             
