@@ -1974,7 +1974,6 @@ TABLES_CONFIG = {
         load_timestamp TEXT DEFAULT CURRENT_TIMESTAMP
     )"""
 },
-# ==================== TABLA WIP ====================
 # ==================== TABLA WIP - CONFIGURACIÓN SIMPLIFICADA ====================
 "wip": {
     "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\PR 5 19\PR519.txt",
@@ -2048,8 +2047,6 @@ TABLES_CONFIG = {
         Curr_Labor TEXT
     )"""
 },
-# ==================== TABLA WIP CON NOMBRES REALES ====================
-
 # ==================== TABLA FINISHGOOD (LIMPIA - SIN ERRORES SQL) ==================== 
 "finishgood": {
     "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\IN 5 39\IN539.txt",
@@ -2088,7 +2085,55 @@ TABLES_CONFIG = {
         Project TEXT
     )"""
 },
-
+# ==================== SORT CODE LIST ==================== 
+"sort_list": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\BM 3 61\BM 3 61.txt",
+    "table_name": "sort_list",
+    "file_type": "fixed_width",
+    "fixed_width_params": {
+        "widths": [10,31,11,9,10,9,13,6,9,15],  # Corregido según tu código
+        "header": 3,  # Corregido
+        "skip_rows": [0],
+        "drop_last_row": False  # No necesario ya que filtras manualmente
+    },
+    "data_filters": {
+        "exclude_rows": {"Sort-code": "End-of-Rep"}  # Filtro automático
+    },
+    "columns_mapping": {
+        'Sort-code': 'SortCode',
+        'Issue-Matl': 'IssueMatl', 
+        'Issue-WO': 'IssueWO',
+        'comp-sort': 'compsort',
+        'raw-sort': 'rawsort', 
+        'create-short': 'createshort',
+        'Mult-woC': 'MultWO'
+    },
+    "columns_order_original": [
+        'Sort-code', 'Description', 'Issue-Matl', 'Issue-WO', 'comp-sort', 
+        'raw-sort', 'create-short', 'Mult-woC'
+    ],
+    "columns_order_renamed": [
+        'SortCode', 'Description', 'IssueMatl', 'IssueWO', 'compsort',
+        'rawsort', 'createshort', 'MultWO'
+    ],
+    "special_processing": {
+        "clear_before_insert": True,
+        "custom_cleaning": True,
+        "sort_list_special_processing": True,  # Flag para procesamiento especial
+        "final_columns_only": True
+    },
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS sort_list(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        SortCode TEXT,
+        Description TEXT,
+        IssueMatl TEXT,
+        IssueWO TEXT,
+        compsort TEXT,
+        rawsort TEXT,
+        createshort TEXT,
+        MultWO TEXT
+    )"""
+},
 # ==================== TABLA RESPONSABLES ACTION WO by PLANTYPE====================
 "Work_order_Actions_responsibles_plantype": {
     "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\ActionCodes\Responsible_by_plantype.xlsx",
@@ -2877,12 +2922,6 @@ def process_whs_location_exact(df, table_config):
     
     return df
 
-# =============================================================================
-# AGREGAR/REEMPLAZAR EN config_tables.py - PROCESAMIENTO WIP EXACTO
-# ====================================================================================
-# ACTUALIZAR apply_special_processing PARA USAR LA NUEVA FUNCIÓN
-# =============================================================================
-
 def apply_special_processing(df, table_config):
     """Aplica procesamiento especial - CON TU LÓGICA WIP EXACTA"""
     special_processing = table_config.get("special_processing", {})
@@ -2964,15 +3003,6 @@ def apply_special_processing(df, table_config):
                 break
     
     return df
-
-
-"""aqui"""
-
-
-# =============================================================================
-# FUNCIONES FALTANTES - AGREGAR AL FINAL DE config_tables.py
-# =============================================================================
-
 
 def process_wip_direct(db_path):
     """
@@ -3296,13 +3326,129 @@ def process_finishgood_direct(db_path):
         
         return False, error_msg, {}
 
-
-
 def is_finishgood_table_direct_processing(table_name):
     """
     Verifica si una tabla debe usar procesamiento directo
     """
     return table_name.lower() == "finishgood"
+
+def process_sort_list_direct(db_path):
+    """
+    Procesador DIRECTO para sort_list usando tu código exacto
+    """
+    import pandas as pd
+    import sqlite3
+    import os
+    from datetime import datetime
+    
+    print(f"🎯 PROCESAMIENTO DIRECTO DE SORT_LIST - Tu código exacto")
+    
+    try:
+        # PASO 1: Leer archivo con tu código exacto
+        print(f"📖 Leyendo archivo BM 3 61.txt...")
+        df = pd.read_fwf(
+            r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\BM 3 61\BM 3 61.txt",
+            widths=[10,31,11,9,10,9,13,6,9,15], 
+            header=3
+        )
+        print(f"   ✅ Archivo leído: {len(df)} filas, {len(df.columns)} columnas")
+        
+        # PASO 2: Tu procesamiento exacto
+        print(f"🔧 Aplicando tu lógica de limpieza...")
+        
+        df.drop([0], axis=0, inplace=True)
+        print(f"   🗑️ Eliminada fila 0: {len(df)} filas restantes")
+        
+        df = df.loc[df['Sort-code']!='End-of-Rep']
+        print(f"   🔽 Filtro Sort-code != End-of-Rep: {len(df)} filas")
+        
+        # PASO 3: Tu renombrado exacto
+        print(f"🔄 Aplicando tu renombrado exacto...")
+        df = df.rename(columns = {
+            'Sort-code':'SortCode',
+            'Issue-Matl':'IssueMatl',
+            'Issue-WO':'IssueWO',
+            'comp-sort':'compsort',
+            'raw-sort':'rawsort',
+            'create-short':'createshort',
+            'Mult-woC':'MultWO'
+        })
+        print(f"   ✅ Columnas renombradas: {list(df.columns)}")
+        print(f"   📊 Datos finales: {len(df)} filas procesadas")
+        
+        # PASO 4: Conectar a base de datos
+        print(f"💾 Conectando a base de datos...")
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # PASO 5: Crear/limpiar tabla
+        create_table_sql = """CREATE TABLE IF NOT EXISTS sort_list(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            SortCode TEXT,
+            Description TEXT,
+            IssueMatl TEXT,
+            IssueWO TEXT,
+            compsort TEXT,
+            rawsort TEXT,
+            createshort TEXT,
+            MultWO TEXT,
+
+        )"""
+        
+        cursor.execute(create_table_sql)
+        print(f"   ✅ Tabla sort_list verificada/creada")
+        
+        # Limpiar contenido anterior
+        cursor.execute("DELETE FROM sort_list")
+        print(f"   🗑️ Contenido anterior eliminado")
+        
+        # PASO 6: Insertar datos
+        print(f"💾 Insertando {len(df)} registros...")
+        df.to_sql('sort_list', conn, if_exists='append', index=False)
+        
+        # PASO 7: Verificar inserción
+        cursor.execute("SELECT COUNT(*) FROM sort_list")
+        final_count = cursor.fetchone()[0]
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"   ✅ Inserción completada: {final_count} registros en BD")
+        
+        # PASO 8: Mostrar muestra de datos
+        if not df.empty:
+            print(f"📄 Muestra de datos procesados:")
+            for i in range(min(5, len(df))):
+                sortcode = df.iloc[i]['SortCode']
+                description = str(df.iloc[i]['Description'])[:30] + "..." if len(str(df.iloc[i]['Description'])) > 30 else df.iloc[i]['Description']
+                entity = df.iloc[i].get('Entity', 'N/A')
+                print(f"   Fila {i+1}: SortCode='{sortcode}', Description='{description}', Entity='{entity}'")
+        
+        # PASO 9: Estadísticas finales
+        stats = {
+            "success": True,
+            "records_processed": len(df),
+            "records_in_db": final_count,
+            "table_recreated": True,
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        
+        return True, f"SORT_LIST procesada exitosamente - {final_count} registros", stats
+        
+    except Exception as e:
+        error_msg = f"Error procesando SORT_LIST directo: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+        
+        return False, error_msg, {}
+
+def is_sort_list_table_direct_processing(table_name):
+    """
+    Verifica si una tabla debe usar procesamiento directo
+    """
+    return table_name.lower() == "sort_list"
 
 
 if __name__ == "__main__":

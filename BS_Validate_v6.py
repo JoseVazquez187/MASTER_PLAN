@@ -931,10 +931,14 @@ class BackScheduleAnalyzer:
             
             # Convertir columnas numéricas numpy a tipos Python nativos
             numeric_columns = ['Materials_Count', 'Total_ReqQty', 'Total_QtyIssue', 'Total_QtyPending', 'Total_ValRequired', 'OpnQ']
+            
+            
+            
+            
             for col in numeric_columns:
                 if col in merged_df.columns:
-                    merged_df[col] = merged_df[col].astype('float64').apply(lambda x: float(x) if pd.notna(x) else 0.0)
-            
+                    # merged_df[col] = merged_df[col].astype('float64').apply(lambda x: float(x) if pd.notna(x) else 0.0)
+                    merged_df[col] = pd.to_numeric(merged_df[col], errors='coerce').fillna(0.0)
             # Convertir columnas booleanas
             bool_columns = ['Has_Materials', 'No_Materials_Required']
             for col in bool_columns:
@@ -3851,7 +3855,6 @@ class FcstSprAnalyzer:
         except Exception as e:
             print(f"❌ Error exportando FCST SPR: {e}")
             return {"success": False, "message": f"Error: {str(e)}"}
-
 
 
 def create_top_items_table(analyzer):

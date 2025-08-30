@@ -6,7 +6,7 @@ import win32gui
 import win32con
 import win32api
 import pandas as pd
-
+"""pepo"""
 cpu = f"{os.environ['USERNAME']}"
 MAIN_WINDOW_TITLE_PARTIAL = "Royal 4 - Live - K-95"
 USERNAME_WINDOW_TITLE_PARTIAL = f"Name ({cpu})"
