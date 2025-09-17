@@ -8,7 +8,7 @@ import threading
 import sqlite3
 from tqdm import tqdm
 
-# === Interfaz Tkinter ===
+# === Interfaz Tkinter === 184720     187791
 root = tk.Tk()
 root.title("Carga y Validación de Cancelaciones")
 root.geometry("900x600")

@@ -1,0 +1,16 @@
+{
+	"nodes":[
+		{"id":"c5957fd1abf1eb82","x":-700,"y":-289,"width":163,"height":60,"type":"text","text":"CODE CLAUDE "},
+		{"id":"4289b45c7aa08c85","x":-537,"y":-192,"width":440,"height":54,"type":"text","text":"PS C:\\Users\\J.Vazquez> docker start -ai node_claude2"},
+		{"id":"18242fa2fe067378","x":-471,"y":-115,"width":672,"height":172,"type":"text","text":"root@73e262446f24:/# export HTTPS_PROXY=http://172.29.4.2:8080\nexport HTTP_PROXY=http://172.29.4.2:8080\nroot@73e262446f24:/# echo $HTTPS_PROXY\nhttp://172.29.4.2:8080\nroot@73e262446f24:/# export NODE_TLS_REJECT_UNAUTHORIZED=0\nroot@73e262446f24:/# claude \"hello world\""},
+		{"id":"fb5b720ee9027f05","x":-336,"y":176,"width":250,"height":60,"type":"text","text":"to create a new container"},
+		{"id":"07785bc81b5895d7","x":-354,"y":328,"width":533,"height":166,"type":"text","text":"docker run -it --name node_claude2 `\n  -v /c/Users/J.Vazquez/Desktop:/Desktop `\n  node_claude_img bash"},
+		{"id":"eebb1c8f60ec4b3a","x":-338,"y":511,"width":589,"height":75,"type":"text","text":"export HTTPS_PROXY=http://172.29.4.2:8080\nexport HTTP_PROXY=http://172.29.4.2:8080"},
+		{"id":"a8121f31b7b4d958","x":-433,"y":581,"width":771,"height":50,"type":"text","text":"export NODE_TLS_REJECT_UNAUTHORIZED=0"},
+		{"id":"f10db281865e4869","x":-486,"y":686,"width":421,"height":60,"type":"text","text":"docker run -it --name node_claude3\nnode_claude_img bash"}
+	],
+	"edges":[
+		{"id":"ee310e11c875bfcf","fromNode":"c5957fd1abf1eb82","fromSide":"bottom","toNode":"4289b45c7aa08c85","toSide":"left"},
+		{"id":"577d0b679e442e95","fromNode":"4289b45c7aa08c85","fromSide":"left","toNode":"18242fa2fe067378","toSide":"left"}
+	]
+}

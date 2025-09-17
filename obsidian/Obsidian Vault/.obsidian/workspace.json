@@ -1,0 +1,231 @@
+{
+  "main": {
+    "id": "c3d7369a28100385",
+    "type": "split",
+    "children": [
+      {
+        "id": "265e32ab712f8e0c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "17a899a92dc7c3c1",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "MASTER PLANNING TRANSACCIONS/EZAIR MAP TRAINING.canvas",
+                "viewState": {
+                  "x": 6847.457289489805,
+                  "y": 266.10927206751956,
+                  "zoom": -0.42371616828108144
+                }
+              },
+              "icon": "lucide-layout-dashboard",
+              "title": "EZAIR MAP TRAINING"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "402741457f4ba1af",
+    "type": "split",
+    "children": [
+      {
+        "id": "1b1c538487f44c31",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "163881b2b69eed6d",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "36fe72d87bca426a",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "379f5f190307e762",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 276.5
+  },
+  "right": {
+    "id": "685d16e9def3540d",
+    "type": "split",
+    "children": [
+      {
+        "id": "0e957c304b1e8bf5",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "fde9ca744d8ddb5b",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Entrenamiento Comprador tactico.pptx",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for Entrenamiento Comprador tactico"
+            }
+          },
+          {
+            "id": "00747d5d2b6ce53e",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Entrenamiento Comprador tactico.pptx",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from Entrenamiento Comprador tactico"
+            }
+          },
+          {
+            "id": "541d274f1331532b",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "84a92aac1d6e3a13",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "MASTER PLANNING TRANSACCIONS/MASTER INDEX FUNCTION.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of MASTER INDEX FUNCTION"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "17a899a92dc7c3c1",
+  "lastOpenFiles": [
+    "Entrenamiento Comprador tactico.pptx",
+    "MASTER PLANNING TRANSACCIONS/IS/Safran's Tickets.canvas",
+    "MASTER PLANNING TRANSACCIONS/EZAIR MAP TRAINING.canvas",
+    "MASTER PLANNING TRANSACCIONS/MASTER INDEX FUNCTION.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/PLANNING/PR 5 3.md",
+    "MASTER PLANNING TRANSACCIONS/attachments/Pasted image 20250915121635.png",
+    "MASTER PLANNING TRANSACCIONS/attachments/Pasted image 20250915121614.png",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/PLANNING/WPR 4 5.md",
+    "MASTER PLANNING TRANSACCIONS/attachments/Pasted image 20250915121355.png",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/PLANNING/ENG PLANNING/ORDER CODE.md",
+    "~$EMB-E2195-PO-044.xlsx",
+    "EMB-E2195-PO-044.xlsx",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/PLANNING/ENG PLANNING/Configuration ID - ConfigID.md",
+    "MASTER PLANNING TRANSACCIONS/attachments/Pasted image 20250909093625.png",
+    "MASTER PLANNING TRANSACCIONS/attachments/Pasted image 20250909093149.png",
+    "MASTER PLANNING TRANSACCIONS/attachments/Pasted image 20250909093122.png",
+    "MASTER PLANNING TRANSACCIONS/IS/CODE CLAUDE.canvas",
+    "MASTER PLANNING TRANSACCIONS/attachments/Pasted image 20250909092731.png",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/QUALITY/CREATE A COC.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/QUALITY/ENTRY FAI.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/PLANNING/ENG PLANNING/WOP 4 4.md",
+    "MASTER PLANNING TRANSACCIONS/attachments/Pasted image 20250909092128.png",
+    "MASTER PLANNING TRANSACCIONS/attachments/Tabla FCST.png",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/PLANNING/ENG PLANNING/OP 5 61.md",
+    "MASTER PLANNING TRANSACCIONS/attachments/Pasted image 20250909091644.png",
+    "MASTER PLANNING TRANSACCIONS/IS/Credentials FCS.canvas",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/PLANNING/ENG PLANNING/WMP 2 1.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/PLANNING/ENG PLANNING/MP 5 9.md",
+    "R4_MANUAL 1.html",
+    "R4_MANUAL 2.html.md",
+    "R4_MANUAL 2.html",
+    "R4_MANUAL.html",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/ENGINNERING/BOMS/CST 52.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/ENGINNERING/BOMS/IN 6 1.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/SUPPLY CHAIN/ORDER POLICY.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/SUPPLY CHAIN/ITEM LEAD TIME REPORT.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/SUPPLY CHAIN/PO 3 51.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/ENGINNERING/BOMS/BM 3 61.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/ENGINNERING/BOMS/IN 9 2.md",
+    "in92.txt",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/ENGINNERING/BOMS/PROPIEDADES DEL ITEM.md",
+    "MASTER PLANNING TRANSACCIONS/INVENTORY/IRPT.canvas",
+    "MASTER PLANNING TRANSACCIONS/EZAIR REPORTS",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/ENGINNERING/BOMS/BM 3 53.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/ENGINNERING/BOMS/BM 3 53.canvas",
+    "EZ Air - PIPO C_25 - Published 10.xlsx",
+    "~$E55-0021 REV BR Master Drawing List.xlsx",
+    "E55-0021 REV BR Master Drawing List 1.xlsx",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/ENGINNERING/ENG TIMES/ROUTING TIMES.canvas",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/FINANCE/CREATE AN INVOICED.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/FINANCE/PRINT INVOICED.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/INFORMATION SYSTEM/BUYER MAINTENANCE.md",
+    "MASTER PLANNING TRANSACCIONS/EZAIR FUNCTIONS/INFORMATION SYSTEM/EMPLOYEE MAINTENANCE.md"
+  ]
+}

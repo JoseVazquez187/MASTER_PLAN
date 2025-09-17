@@ -1,0 +1,212 @@
+{
+  "main": {
+    "id": "36f35c3a758455c2",
+    "type": "split",
+    "children": [
+      {
+        "id": "b5c25d874cbf03e0",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "add23b7d4242159c",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "New tab"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "091e2d36e91143c1",
+    "type": "split",
+    "children": [
+      {
+        "id": "e4eb66171f40a62a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "8160d7b7a096d015",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "byModifiedTime",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "8a28da851b6d0134",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": true,
+                "explainSearch": true,
+                "collapseAll": true,
+                "extraContext": true,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "2a65cfc497e60ca2",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 200
+  },
+  "right": {
+    "id": "5d34e28578b9992e",
+    "type": "split",
+    "children": [
+      {
+        "id": "2522cd83d823a5f4",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "b73ca26d5e4946e6",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "f3ac6ea3afe457e3",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "BIN LOCATION MAINTENANCE.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from BIN LOCATION MAINTENANCE"
+            }
+          },
+          {
+            "id": "52a3925ea4c6b165",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "ede403b1ea000aea",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "BIN LOCATION MAINTENANCE.md"
+              },
+              "icon": "lucide-list",
+              "title": "Outline of BIN LOCATION MAINTENANCE"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "bases:Create new base": false,
+      "graph:Open graph view": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "canvas:Create new canvas": false,
+      "switcher:Open quick switcher": false
+    }
+  },
+  "active": "add23b7d4242159c",
+  "lastOpenFiles": [
+    "IS/Credentials.md",
+    "2025-08-28.md",
+    "EZAIR/PLANNING/PROGRAMMING/PINTING A WORK ORDER.md",
+    "MASTER INDEX FUNCTION.md",
+    "EZAIR/WHEREHOUSE/INVENTORY_TRANSACTIONS.md",
+    "EZAIR/WHEREHOUSE/MOVE BIN LOCATION.md",
+    "EZAIR/QUALITY/CREATE A COC.md",
+    "EZAIR/ENGINNERING/BOMS/ITEM MANTINANCE.md",
+    "EZAIR/FINANCE",
+    "IS",
+    "INVENTORY/TOP ITEMS/L530.md",
+    "EZAIR/PLANNING/PROGRAMMING/CHECK RUN_NO_FROM_WO.md",
+    "INVENTORY REDUCTION EXPIRED.md",
+    "EZAIR/INFORMATION SYSTEM/EMPLOYEE MAINTENANCE.md",
+    "INVENTORY/TOP ITEMS/Untitled 1.md",
+    "EZAIR/INFORMATION SYSTEM/BUYER MAINTENANCE.md",
+    "EZAIR/SUPPLY CHAIN/ITEM LEAD TIME REPORT.md",
+    "attachments/Pasted image 20250307114738.png",
+    "EZAIR/SUPPLY CHAIN",
+    "INVENTORY/TOP ITEMS",
+    "INVENTORY",
+    "EZAIR/LOGISTIC/PRINT INVOICED.md",
+    "attachments/Pasted image 20250306163953.png",
+    "EZAIR/PLANNING/ENG PLANNING/LOAD FORECAST.md",
+    "attachments/Pasted image 20250306124937.png",
+    "attachments/Pasted image 20250306124831.png",
+    "test_canvas.canvas",
+    "attachments/Pasted image 20250305133545.png",
+    "attachments/Pasted image 20250305133017.png",
+    "EZAIR/LOGISTIC/CREATE AN INVOICED.md",
+    "attachments/Pasted image 20250305130651.png",
+    "EZAIR/PLANNING/PLANNING/CREATE A WORK ORDER.md",
+    "EZAIR/PLANNING/CUSTOMER_SERVICE/CREATE A SALES ORDER.md",
+    "attachments/Pasted image 20250305125112.png",
+    "EZAIR/INFORMATION SYSTEM",
+    "attachments/Pasted image 20250305124247.png",
+    "ITEM MAINTENANCE.md",
+    "BOMS.md",
+    "EZAIR/INDEX",
+    "INDEX/INDEX.md",
+    "PR 4 1.md",
+    "EZAIR/PLANNING/PLANNING/PR 4 1.md",
+    "attachments/Pasted image 20250305121624.png",
+    "EZAIR/INDEX",
+    "EZAIR/PLANNING/PLANNING/PR 4 1_WORKORDER ENTRY.md",
+    "EZAIR/PLANNING/CUSTOMER_SERVICE",
+    "EZAIR/QUALITY"
+  ]
+}

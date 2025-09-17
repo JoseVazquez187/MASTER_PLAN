@@ -1,0 +1,42 @@
+{
+	"nodes":[
+		{"id":"c8c35cc369cda6d1","type":"text","text":"SAFRAN'S TICKETS","x":-680,"y":-380,"width":196,"height":57,"color":"6"},
+		{"id":"73623056c98bd95b","type":"text","text":"Group","x":-532,"y":-280,"width":96,"height":60,"color":"5"},
+		{"id":"3a7db0c77bad7ed2","type":"text","text":"US.AppsMgmt.SCA.L3.R4_R5","x":-380,"y":-280,"width":250,"height":60,"color":"4"},
+		{"id":"ebe73e0b74d0a02d","type":"text","text":"Requests","x":-340,"y":-160,"width":120,"height":50,"color":"1"},
+		{"id":"c6832d8b8e3ca051","type":"text","text":"Mass Update -WORK ORDERS","x":-130,"y":-160,"width":271,"height":50,"color":"5"},
+		{"id":"fe64039d405be73a","type":"text","text":"SPECIAL RUN CDRP ","x":-160,"y":140,"width":250,"height":50,"color":"5"},
+		{"id":"16462374727fb975","type":"text","text":"Could you kindly help me run the special process **CDRP** tonight? The PPCP department has requested this special run due to recent planning movements.","x":170,"y":115,"width":498,"height":100,"color":"2"},
+		{"id":"69b6cd95a6f56d6c","type":"text","text":"Thank you very much for your support.","x":170,"y":240,"width":375,"height":60,"color":"2"},
+		{"id":"33b7432f3a87b2e4","type":"text","text":"Request for Special CDRP Run – November 11, 2022","x":169,"y":40,"width":429,"height":57,"color":"2"},
+		{"id":"795b4a105aaf4c75","type":"text","text":"Request for Mass Update of Work Orders","x":206,"y":-405,"width":355,"height":50,"color":"2"},
+		{"id":"8bfd14990fe373ec","type":"text","text":"I would like to kindly request your support with a mass update of the attached file. The intention is to update the due dates for the work orders listed","x":260,"y":-334,"width":471,"height":108,"color":"2"},
+		{"id":"651f5a1406eaef3b","type":"text","text":"Please let me know if you require any additional information or clarification from our side to proceed with the update.\n\nThank you in advance for your support.","x":289,"y":-196,"width":512,"height":123,"color":"2"},
+		{"id":"c64ffe4b9ee23654","type":"file","file":"MASTER PLANNING TRANSACCIONS/attachments/Miscellaneous Ticket.png","x":-836,"y":-155,"width":400,"height":164,"color":"6"},
+		{"id":"249208be1a0615ba","type":"file","file":"MASTER PLANNING TRANSACCIONS/attachments/Fill the fields.png","x":-835,"y":97,"width":399,"height":231,"color":"6"},
+		{"id":"84719f17574bb804","type":"text","text":"NEW R4 ACCOUNT","x":-717,"y":408,"width":185,"height":50},
+		{"id":"5658f67ce982f4b6","type":"text","text":"Rauting\n","x":-160,"y":403,"width":250,"height":60},
+		{"id":"d954816c974c06d3","type":"text","text":"Request for Mass Update for Roting E-DECOR","x":170,"y":343,"width":471,"height":50,"color":"2"},
+		{"id":"bef0ab9eec4511a0","type":"text","text":"I would like to kindly request your support with a mass update of the attached file. The intention is to update the Items in the file with a new Routing","x":170,"y":438,"width":582,"height":78,"color":"2"},
+		{"id":"4e98301ac34596ba","type":"text","text":"Thank you very much for your support.","x":170,"y":553,"width":375,"height":50,"color":"2"}
+	],
+	"edges":[
+		{"id":"36d5799b9cef9842","fromNode":"c8c35cc369cda6d1","fromSide":"bottom","toNode":"73623056c98bd95b","toSide":"left"},
+		{"id":"2b58ec01b4f29191","fromNode":"73623056c98bd95b","fromSide":"right","toNode":"3a7db0c77bad7ed2","toSide":"left"},
+		{"id":"5bc69ab85efc8a5b","fromNode":"3a7db0c77bad7ed2","fromSide":"bottom","toNode":"ebe73e0b74d0a02d","toSide":"top"},
+		{"id":"7a4a00a2a26eedd9","fromNode":"ebe73e0b74d0a02d","fromSide":"right","toNode":"c6832d8b8e3ca051","toSide":"left"},
+		{"id":"f19e2416baf4bfab","fromNode":"ebe73e0b74d0a02d","fromSide":"right","toNode":"fe64039d405be73a","toSide":"left"},
+		{"id":"ab9162443ffbbff2","fromNode":"fe64039d405be73a","fromSide":"right","toNode":"16462374727fb975","toSide":"left"},
+		{"id":"3df05283e6809570","fromNode":"fe64039d405be73a","fromSide":"right","toNode":"33b7432f3a87b2e4","toSide":"left"},
+		{"id":"5831d18d63c6aea0","fromNode":"fe64039d405be73a","fromSide":"right","toNode":"69b6cd95a6f56d6c","toSide":"left"},
+		{"id":"9202d7471140698b","fromNode":"c6832d8b8e3ca051","fromSide":"right","toNode":"8bfd14990fe373ec","toSide":"left"},
+		{"id":"b1280d570a157da1","fromNode":"c6832d8b8e3ca051","fromSide":"right","toNode":"795b4a105aaf4c75","toSide":"left"},
+		{"id":"ebf0802906e7c1e0","fromNode":"c6832d8b8e3ca051","fromSide":"right","toNode":"651f5a1406eaef3b","toSide":"left"},
+		{"id":"f101d69e859e1153","fromNode":"c8c35cc369cda6d1","fromSide":"bottom","toNode":"c64ffe4b9ee23654","toSide":"top"},
+		{"id":"3cf0b50cdd79b802","fromNode":"c64ffe4b9ee23654","fromSide":"bottom","toNode":"249208be1a0615ba","toSide":"top"},
+		{"id":"c4ef55794b301212","fromNode":"ebe73e0b74d0a02d","fromSide":"right","toNode":"5658f67ce982f4b6","toSide":"left"},
+		{"id":"f7f6d41b428751f3","fromNode":"5658f67ce982f4b6","fromSide":"right","toNode":"d954816c974c06d3","toSide":"left"},
+		{"id":"04e2ad08fb36b39c","fromNode":"5658f67ce982f4b6","fromSide":"right","toNode":"bef0ab9eec4511a0","toSide":"left"},
+		{"id":"b106e3a3ffd93921","fromNode":"5658f67ce982f4b6","fromSide":"right","toNode":"4e98301ac34596ba","toSide":"left"}
+	]
+}

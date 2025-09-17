@@ -1,0 +1,11 @@
+{
+	"nodes":[
+		{"id":"4efabcd97fd015d2","type":"text","text":"FUP-FOLLOW UP EMBRAER'S FILE","x":-1510,"y":-1097,"width":285,"height":50,"color":"1"},
+		{"id":"14166d5843274d9c","type":"text","text":"ORDER ENTRY PROCESS","x":-1301,"y":-1006,"width":224,"height":50,"color":"6"},
+		{"id":"5bcca023e2df5ac0","type":"text","text":"Last Invoiced Balance Logic","x":-1127,"y":-919,"width":250,"height":50,"color":"2"}
+	],
+	"edges":[
+		{"id":"0adb3d60ca221951","fromNode":"4efabcd97fd015d2","fromSide":"bottom","toNode":"14166d5843274d9c","toSide":"left"},
+		{"id":"b5ea4c8bdd7c68ce","fromNode":"14166d5843274d9c","fromSide":"bottom","toNode":"5bcca023e2df5ac0","toSide":"left"}
+	]
+}

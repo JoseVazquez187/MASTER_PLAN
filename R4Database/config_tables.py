@@ -189,6 +189,104 @@ TABLES_CONFIG = {
         Memo_2 TEXT
     )"""
 },
+# ==================== TABLA LT_BY_PROCESS ====================
+"lt_by_process": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\Parche_Expedite\PlanTypes_areas_primarias.xlsx",
+    "table_name": "lt_by_process",
+    "file_type": "excel",
+    "excel_params": {
+        "skiprows": 0,
+        "dtype": "str"
+    },
+    "expected_columns": [
+        'Plan-Type', 'LT_PlanType'
+    ],
+    "columns_mapping": {
+        'Plan-Type': 'PlanType',
+        'LT_PlanType': 'LT_PlanType'
+    },
+    "columns_order_original": [
+        'Plan-Type', 'LT_PlanType'
+    ],
+    "columns_order_renamed": [
+        'PlanType', 'LT_PlanType'
+    ],
+    "uppercase_columns": [
+        'PlanType'  # PlanType será convertido a mayúsculas
+    ],
+    "special_processing": {
+        "clear_before_insert": True,
+        "validate_columns": True,
+        "custom_cleaning": True,
+        "column_name_cleaning": True,
+        "numeric_conversion": ["LT_PlanType"],
+        "auto_detect_header": True
+    },
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS lt_by_process(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        PlanType TEXT,
+        LT_PlanType REAL
+    )"""
+},
+
+# ==================== TABLA LEADTIMES_PARCHADOS ====================
+"leadtimes_parchados": {
+    "source_file": r"J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\Parche_Expedite\LeadTime_Parche.xlsx",
+    "table_name": "leadtimes_parchados",
+    "file_type": "excel",
+    "excel_params": {
+        "skiprows": 0,
+        "dtype": "str"
+    },
+    "expected_columns": [
+        'ItemNo', 'LeadTime'
+    ],
+    "columns_mapping": {
+        'ItemNo': 'ItemNo',
+        'LeadTime': 'LeadTime'
+    },
+    "columns_order_original": [
+        'ItemNo', 'LeadTime'
+    ],
+    "columns_order_renamed": [
+        'ItemNo', 'LeadTime'
+    ],
+    "uppercase_columns": [
+        'ItemNo'  # ItemNo será convertido a mayúsculas
+    ],
+    "special_processing": {
+        "clear_before_insert": True,
+        "validate_columns": True,
+        "custom_cleaning": True,
+        "column_name_cleaning": True,
+        "numeric_conversion": ["LeadTime"],
+        "auto_detect_header": True
+    },
+    "create_table_sql": """CREATE TABLE IF NOT EXISTS leadtimes_parchados(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ItemNo TEXT,
+        LeadTime REAL
+    )"""
+},
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # ==================== TABLA EXPEDITE ====================
 "expedite": {
     "source_file": r"J:\Departments\Material Control\Purchasing\Tools\ComprasDB\Expedite.csv",
@@ -419,7 +517,7 @@ TABLES_CONFIG = {
         'Lab_Rem', 'Mat_IN', 'Mat_Rem', 'This_lvl', 'Lab_Hrs'
     ],
     "uppercase_columns": [
-        'Sort'
+        'Sort','Component'
     ],
     "special_processing": {
         "clear_before_insert": True,
@@ -1597,7 +1695,7 @@ TABLES_CONFIG = {
         "header": 0,        # Usar la primera fila (después del skip) como header
         "usecols": "A:G"    # Solo usar las primeras 7 columnas (A-G), elimina las últimas 3
     },
-    
+
     # ✅ NUEVO: Filtrar filas de metadata del sistema
     "data_filters": {
         "exclude_rows_containing": [
@@ -2683,6 +2781,8 @@ def clean_data_remove_quotes(df):
 
 def apply_data_transformations(df, table_config):
     """Aplica transformaciones especiales de datos (uppercase, strip, etc.)"""
+    table_name = table_config.get("table_name", "")
+    
     # Aplicar strip a todas las columnas de texto
     print("   🧹 Aplicando strip a columnas de texto...")
     for col in df.columns:
@@ -2692,17 +2792,80 @@ def apply_data_transformations(df, table_config):
     # Remover comillas simples
     df = clean_data_remove_quotes(df)
     
-    # Aplicar uppercase a columnas específicas
+    # PROCESAMIENTO ESPECÍFICO PARA BOM - Component en mayúsculas
+    if table_name == "bom" and 'Component' in df.columns:
+        print("   🔤 TABLA BOM: Aplicando strip + mayúsculas a columna Component")
+        df['Component'] = df['Component'].astype(str).str.strip().str.upper()
+        print(f"   ✅ Component procesada: {df['Component'].nunique()} valores únicos")
+    
+    # PROCESAMIENTO ESPECÍFICO PARA IN92 - ItemNo en mayúsculas  
+    if table_name == "in92" and 'ItemNo' in df.columns:
+        print("   🔤 TABLA IN92: Aplicando strip + mayúsculas a columna ItemNo")
+        df['ItemNo'] = df['ItemNo'].astype(str).str.strip().str.upper()
+        print(f"   ✅ ItemNo procesada: {df['ItemNo'].nunique()} valores únicos")
+    
+    # PROCESAMIENTO ESPECÍFICO PARA LT_BY_PROCESS - PlanType en mayúsculas
+    if table_name == "lt_by_process" and 'PlanType' in df.columns:
+        print("   🔤 TABLA LT_BY_PROCESS: Aplicando strip + mayúsculas a columna PlanType")
+        df['PlanType'] = df['PlanType'].astype(str).str.strip().str.upper()
+        print(f"   ✅ PlanType procesada: {df['PlanType'].nunique()} valores únicos")
+    
+    # PROCESAMIENTO ESPECÍFICO PARA LEADTIMES_PARCHADOS - ItemNo en mayúsculas
+    if table_name == "leadtimes_parchados" and 'ItemNo' in df.columns:
+        print("   🔤 TABLA LEADTIMES_PARCHADOS: Aplicando strip + mayúsculas a columna ItemNo")
+        df['ItemNo'] = df['ItemNo'].astype(str).str.strip().str.upper()
+        print(f"   ✅ ItemNo procesada: {df['ItemNo'].nunique()} valores únicos")
+    
+    # Aplicar uppercase a columnas específicas (configuración original)
     uppercase_columns = table_config.get("uppercase_columns", [])
     for col in uppercase_columns:
         if col in df.columns:
-            df[col] = df[col].astype(str).str.upper()
-            print(f"   🔤 Aplicado uppercase a columna: {col}")
+            # Evitar procesar dos veces las columnas ya procesadas específicamente
+            if not ((table_name == "bom" and col == "Component") or 
+                    (table_name == "in92" and col == "ItemNo") or
+                    (table_name == "lt_by_process" and col == "PlanType") or
+                    (table_name == "leadtimes_parchados" and col == "ItemNo")):
+                df[col] = df[col].astype(str).str.upper()
+                print(f"   🔤 Aplicado uppercase a columna: {col}")
     
     # Aplicar procesamiento especial
     df = apply_special_processing(df, table_config)
     
     return df
+
+def validate_transformations(df, table_name):
+    """Valida que las transformaciones se aplicaron correctamente"""
+    if table_name == "bom" and 'Component' in df.columns:
+        # Verificar que no hay componentes en minúsculas
+        lowercase_count = df['Component'].str.islower().sum()
+        if lowercase_count > 0:
+            print(f"   ⚠️ ADVERTENCIA: {lowercase_count} componentes aún en minúsculas")
+        else:
+            print(f"   ✅ Todos los componentes están en mayúsculas")
+    
+    if table_name == "in92" and 'ItemNo' in df.columns:
+        # Verificar que no hay ItemNo en minúsculas
+        lowercase_count = df['ItemNo'].str.islower().sum()
+        if lowercase_count > 0:
+            print(f"   ⚠️ ADVERTENCIA: {lowercase_count} ItemNo aún en minúsculas")
+        else:
+            print(f"   ✅ Todos los ItemNo están en mayúsculas")
+    
+    if table_name == "lt_by_process" and 'PlanType' in df.columns:
+        # Verificar que no hay PlanType en minúsculas
+        lowercase_count = df['PlanType'].str.islower().sum()
+        if lowercase_count > 0:
+            print(f"   ⚠️ ADVERTENCIA: {lowercase_count} PlanType aún en minúsculas")
+        else:
+            print(f"   ✅ Todos los PlanType están en mayúsculas")
+    
+    if table_name == "leadtimes_parchados" and 'ItemNo' in df.columns:
+        # Verificar que no hay ItemNo en minúsculas
+        lowercase_count = df['ItemNo'].str.islower().sum()
+        if lowercase_count > 0:
+            print(f"   ⚠️ ADVERTENCIA: {lowercase_count} ItemNo aún en minúsculas")
+        else:
+            print(f"   ✅ Todos los ItemNo están en mayúsculas")
 
 def validate_vendor_columns(df, table_config):
     """Validación especial para tabla vendor"""
