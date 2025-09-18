@@ -269,24 +269,6 @@ TABLES_CONFIG = {
     )"""
 },
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ==================== TABLA EXPEDITE ====================
 "expedite": {
     "source_file": r"J:\Departments\Material Control\Purchasing\Tools\ComprasDB\Expedite.csv",

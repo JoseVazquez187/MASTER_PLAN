@@ -12,7 +12,7 @@ class ExpediteTableApp:
         self.root.geometry("900x700")
         
         # Variables de configuración
-        self.path_conn = "BOM_Procesado.db"  # Base de datos existente
+        self.path_conn = "C:\\Users\\J.Vazquez\\Desktop\\MASTER_PLAN\\BackSchedule\\BOM_Procesado.db"  # Base de datos existente
         self.folder_db = ""  # Se establecerá cuando selecciones el archivo
         
         # Ruta del archivo de días festivos

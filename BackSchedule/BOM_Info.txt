@@ -1,0 +1,55 @@
+INFORMACIÓN DE CREACIÓN DE BASE DE DATOS BOM
+==================================================
+Fecha de creación: 2025-09-17
+Hora de creación: 13:02:30
+Timestamp completo: 2025-09-17 13:02:30.837754
+Base de datos: c:\Users\J.Vazquez\Desktop\MASTER_PLAN\BackSchedule\BOM_Procesado.db
+Log de proceso: c:\Users\J.Vazquez\Desktop\MASTER_PLAN\BackSchedule\BOM_Log.txt
+==================================================
+
+
+VALIDACIÓN DE ARCHIVOS DE DEPENDENCIAS:
+============================================================
+Fecha de validación: 2025-09-17 13:02:30
+
+1. SUPERBOM.txt
+   Ruta: J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\SUPERBOM\SUPERBOM.txt
+   Existe: SÍ
+   Última modificación: 2025-09-17 11:50:51
+   Peso: 78.91 MB
+   Días de antigüedad: 0
+   Estado: ACTUAL (mismo día)
+----------------------------------------
+2. LeadTime_Parche.xlsx
+   Ruta: J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\Parche_Expedite\LeadTime_Parche.xlsx
+   Existe: SÍ
+   Última modificación: 2025-09-09 11:11:39
+   Peso: 0.20 MB
+   Días de antigüedad: 8
+   Estado: ACEPTABLE (menos de 30 días)
+----------------------------------------
+3. PlanTypes_areas_primarias.xlsx
+   Ruta: J:\Departments\Operations\Shared\IT Administration\Python\IRPT\WHS PLAN\FILES\Parche_Expedite\PlanTypes_areas_primarias.xlsx
+   Existe: SÍ
+   Última modificación: 2025-07-28 09:23:39
+   Peso: 0.01 MB
+   Días de antigüedad: 51
+   Estado: ANTIGUO (51 días)
+----------------------------------------
+
+RESUMEN DE VALIDACIÓN:
+Total de archivos verificados: 3
+Archivos encontrados: 3
+Archivos recientes (≤7 días): 1
+Estado general: REVISAR ARCHIVOS ANTIGUOS
+============================================================
+
+RESULTADOS DEL PROCESAMIENTO:
+==================================================
+Fecha de finalización: 2025-09-17
+Hora de finalización: 13:13:32
+Total de keys procesados: 7782
+Total de errores: 0
+Total de omitidos: 0
+Estado: COMPLETADO EXITOSAMENTE
+==================================================

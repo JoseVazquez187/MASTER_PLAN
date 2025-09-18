@@ -5,19 +5,7 @@ import os
 from tkinter import Tk, filedialog
 # === CONFIGURACIÓN DE RUTAS ===
 
-
 base_username = os.getlogin()
-# username_with_one = base_username + ".ONE"
-
-# user_path_with_one = os.path.join("C:\\Users", username_with_one)
-# user_path_normal = os.path.join("C:\\Users", base_username)
-
-# if os.path.exists(user_path_with_one):
-#     username = username_with_one
-# else:
-#     username = base_username
-
-
 desktop_path = os.path.join("C:\\Users", base_username, "Desktop")
 
 # === Selección del archivo de Expedite ===
@@ -40,7 +28,7 @@ path_oh_db = os.path.join(compras_db_folder, "compras_DB.db")
 coverage_folder = os.path.join(desktop_path, "Coverage")
 if not os.path.exists(coverage_folder):
     os.makedirs(coverage_folder)
-output_db = os.path.join(coverage_folder, "CoberturaMateriales.db")
+output_db = os.path.join(coverage_folder, "CoberturaMaterialesV2.db")
 
 # === Obtener OH ===
 def get_oh_information():
@@ -90,20 +78,54 @@ def get_open_order_information():
     oo['RevPrDt'] = pd.to_datetime(oo['RevPrDt'])
     return oo.sort_values(by=['ItemNo', 'RevPrDt'])
 
+# === OBTENER DINÁMICAMENTE TODAS LAS COLUMNAS DEL EXPEDITE ===
+print("🔍 Detectando columnas del expedite...")
+conn_temp = sqlite3.connect(path_exp_db)
+expedite_columns_info = pd.read_sql("PRAGMA table_info(expedite)", conn_temp)
+expedite_columns = expedite_columns_info['name'].tolist()
+conn_temp.close()
+
+print(f"✅ Detectadas {len(expedite_columns)} columnas en expedite:")
+for i, col in enumerate(expedite_columns, 1):
+    print(f"  {i:2d}. {col}")
+
 # === Crear DB vacía antes de insertar progresivamente ===
 if os.path.exists(output_db):
     os.remove(output_db)
 conn_out = sqlite3.connect(output_db)
 cur_out = conn_out.cursor()
 
-# Crear tabla para Cobertura si no existe
-cur_out.execute("""
+# === CREAR TABLA DINÁMICAMENTE ===
+# Columnas de cobertura (fijas)
+coverage_columns = [
+    "ItemNo TEXT", "ReqDate TEXT", "ReqQty REAL", "Index_Item INTEGER",
+    "OH_Coverage REAL", "OpnQ REAL", "OpnQ_PO REAL", "Fill TEXT",
+    "WO_used TEXT", "FillLot TEXT", "PO_used TEXT", "Balance REAL"
+]
+
+# Columnas que ya están en cobertura (para evitar duplicados)
+coverage_column_names = ["ItemNo", "ReqDate", "ReqQty"]
+
+# Columnas del expedite (dinámicas) - excluir las que ya están en cobertura
+expedite_table_columns = []
+for col in expedite_columns:
+    if col in coverage_column_names:
+        continue  # Saltar columnas que ya están en cobertura
+    elif col == 'OH':
+        expedite_table_columns.append("OH_Original REAL")
+    else:
+        # Escapar nombres de columnas con caracteres especiales
+        col_escaped = f'"{col}"' if '-' in col or ' ' in col else col
+        expedite_table_columns.append(f"{col_escaped} TEXT")
+
+all_columns = coverage_columns + expedite_table_columns
+create_table_sql = f"""
 CREATE TABLE IF NOT EXISTS Cobertura (
-    ItemNo TEXT, ReqDate TEXT, ReqQty REAL, Index_Item INTEGER,
-    OH REAL, OpnQ REAL, OpnQ_PO REAL, Fill TEXT,
-    WO_used TEXT, FillLot TEXT, PO_used TEXT, Balance REAL
+    {', '.join(all_columns)}
 )
-""")
+"""
+
+cur_out.execute(create_table_sql)
 cur_out.execute("""
 CREATE TABLE IF NOT EXISTS CoberturaPOs (
     ItemNo TEXT, PO_Line TEXT, QtyUsed REAL,
@@ -112,67 +134,75 @@ CREATE TABLE IF NOT EXISTS CoberturaPOs (
 """)
 conn_out.commit()
 
-# === Cargar requerimientos desde Expedite ===
+# === CARGAR TODAS LAS COLUMNAS DINÁMICAMENTE ===
+print("📊 Cargando datos del expedite...")
 conn = sqlite3.connect(path_exp_db)
-df = pd.read_sql("SELECT ItemNo, ReqDate, ReqQty FROM expedite_parchado", conn)
+# Construir SELECT dinámicamente
+columns_for_select = []
+for col in expedite_columns:
+    if '-' in col or ' ' in col:
+        columns_for_select.append(f'"{col}"')
+    else:
+        columns_for_select.append(col)
+
+select_sql = f"SELECT {', '.join(columns_for_select)} FROM expedite"
+df = pd.read_sql(select_sql, conn)
 conn.close()
 
-
-
-
-# df['ReqDate'] = pd.to_datetime(df['ReqDate'])
-df['ReqDate'] = pd.to_datetime(df['ReqDate'], errors='coerce')
-# Paso 1: Asegúrate que ReqQty es numérico antes de agrupar
+# === PREPARAR AGRUPAMIENTO DINÁMICO ===
+df['ReqDate'] = pd.to_datetime(df['ReqDate'])
 df['ReqQty'] = pd.to_numeric(df['ReqQty'], errors='coerce')
 
-# Paso 2: Luego agrupa y suma
-df_grouped = df.groupby(['ItemNo', 'ReqDate'], as_index=False)['ReqQty'].sum()
+# Crear diccionario de agregación dinámicamente
+agg_dict = {'ReqQty': 'sum'}
+for col in expedite_columns:
+    if col not in ['ItemNo', 'ReqDate', 'ReqQty']:
+        agg_dict[col] = 'first'
 
-# Paso 3: Ordena y agrega índice
+df_grouped = df.groupby(['ItemNo', 'ReqDate'], as_index=False).agg(agg_dict)
 df_grouped = df_grouped.sort_values(by=['ItemNo', 'ReqDate'])
 df_grouped['Index_Item'] = df_grouped.groupby('ItemNo').cumcount() + 1
-
-# (opcional) Limpieza de ItemNo
 df_grouped['ItemNo'] = df_grouped['ItemNo'].astype(str).str.upper()
 
-
 # === Obtener fuentes de cobertura ===
+print("🔍 Obteniendo fuentes de cobertura...")
 piv_oh = get_oh_information()
 df_wo_raw = get_wo_information()
 piv_rwk = get_rework_information_lote()
-df_po_raw = get_open_order_information()
+piv_po_raw = get_open_order_information()
 
 # === Preparar estructuras ===
 piv_wo_sum = df_wo_raw.groupby('ItemNo', as_index=False)['OpnQ'].sum()
-piv_po_sum = df_po_raw.groupby('ItemNo', as_index=False)['OpnQ'].sum()
+piv_po_sum = piv_po_raw.groupby('ItemNo', as_index=False)['OpnQ'].sum()
+
+# Renombrar columna OH del piv_oh para evitar conflicto con OH del expedite
+piv_oh = piv_oh.rename(columns={'OH': 'OH_Coverage'})
+
 df_cov = df_grouped.merge(piv_oh, on='ItemNo', how='left') \
                 .merge(piv_wo_sum, on='ItemNo', how='left') \
                 .merge(piv_po_sum, on='ItemNo', how='left', suffixes=('', '_PO'))
 
-cols = ['OH', 'OpnQ', 'OpnQ_PO']
+cols = ['OH_Coverage', 'OpnQ', 'OpnQ_PO']
 df_cov[cols] = df_cov[cols].apply(pd.to_numeric, errors='coerce').fillna(0).astype(float)
-
 
 # === Agrupar por ItemNo para insertar por ítem ===
 rwk_dict = {k: g.copy() for k, g in piv_rwk.groupby('ItemNo')}
 wo_dict = {k: g.copy() for k, g in df_wo_raw.groupby('ItemNo')}
-po_dict = {k: g.copy() for k, g in df_po_raw.groupby('ItemNo')}
+po_dict = {k: g.copy() for k, g in piv_po_raw.groupby('ItemNo')}
 
+print("🚀 Procesando cobertura por ítem...")
 for item, group in tqdm(df_cov.groupby('ItemNo'), desc="Insertando por ítem"):
     group = group.sort_values(by='ReqDate')
     
     estado = {
-        'oh': group['OH'].iloc[0],
+        'oh': group['OH_Coverage'].iloc[0],
         'wo': wo_dict.get(item, pd.DataFrame()),
         'rwk': rwk_dict.get(item, pd.DataFrame()),
         'po': po_dict.get(item, pd.DataFrame())
     }
 
     for _, row in group.iterrows():
-
-        restante = row['ReqQty']
-
-        restante = float(restante)
+        restante = float(row['ReqQty'])
         req_date = row['ReqDate']
         index_item = int(row['Index_Item'])
 
@@ -239,21 +269,59 @@ for item, group in tqdm(df_cov.groupby('ItemNo'), desc="Insertando por ítem"):
                         fill = '❌ Faltante'
                         balance = -restante
 
-        cur_out.execute("""
-            INSERT INTO Cobertura (
-                ItemNo, ReqDate, ReqQty, Index_Item, OH, OpnQ, OpnQ_PO,
-                Fill, WO_used, FillLot, PO_used, Balance
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
+        # === INSERTAR DINÁMICAMENTE ===
+        # Valores de cobertura (fijos)
+        coverage_values = [
             item, str(req_date), row['ReqQty'], index_item,
-            row['OH'], row['OpnQ'], row['OpnQ_PO'],
-            fill,
-            ', '.join(wo_used),
-            ', '.join(lotes_usados),
-            ', '.join(po_usados),
-            balance
-        ))
+            row['OH_Coverage'], row['OpnQ'], row['OpnQ_PO'],
+            fill, ', '.join(wo_used), ', '.join(lotes_usados), 
+            ', '.join(po_usados), balance
+        ]
+        
+        # Valores del expedite (dinámicos) - excluir columnas que ya están en cobertura
+        expedite_values = []
+        for col in expedite_columns:
+            if col in coverage_column_names:
+                continue  # Saltar columnas que ya están en cobertura
+            elif col == 'OH':
+                # OH del expedite se convierte en OH_Original
+                value = row.get('OH', 0)
+                if pd.notna(value) and col in ['OH', 'ReqQty'] or str(value).replace('.','').replace('-','').isdigit():
+                    expedite_values.append(float(value))
+                else:
+                    expedite_values.append(0.0)
+            else:
+                expedite_values.append(str(row.get(col, '')))
+        
+        all_values = coverage_values + expedite_values
+        
+        # Crear placeholders dinámicamente
+        placeholders = ', '.join(['?'] * len(all_values))
+        
+        # Crear lista de columnas para INSERT
+        coverage_col_names = [
+            "ItemNo", "ReqDate", "ReqQty", "Index_Item", "OH_Coverage", "OpnQ", "OpnQ_PO",
+            "Fill", "WO_used", "FillLot", "PO_used", "Balance"
+        ]
+        
+        expedite_col_names = []
+        for col in expedite_columns:
+            if col in coverage_column_names:
+                continue  # Saltar columnas que ya están en cobertura
+            elif col == 'OH':
+                expedite_col_names.append('OH_Original')
+            elif '-' in col or ' ' in col:
+                expedite_col_names.append(f'"{col}"')
+            else:
+                expedite_col_names.append(col)
+        
+        all_column_names = coverage_col_names + expedite_col_names
+        columns_str = ', '.join(all_column_names)
+        
+        insert_sql = f"INSERT INTO Cobertura ({columns_str}) VALUES ({placeholders})"
+        cur_out.execute(insert_sql, all_values)
 
     conn_out.commit()
 
 conn_out.close()
+print(f"✅ Proceso completado. Base de datos creada con {len(expedite_columns)} columnas del expedite.")

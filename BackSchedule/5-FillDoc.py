@@ -145,12 +145,13 @@ for col in expedite_columns:
     else:
         columns_for_select.append(col)
 
-select_sql = f"SELECT {', '.join(columns_for_select)} FROM expedite"
+select_sql = f"SELECT {', '.join(columns_for_select)} FROM expedite_parchado"
 df = pd.read_sql(select_sql, conn)
 conn.close()
 
 # === PREPARAR AGRUPAMIENTO DINÁMICO ===
-df['ReqDate'] = pd.to_datetime(df['ReqDate'])
+
+df['ReqDate'] = pd.to_datetime(df['ReqDate'], errors='coerce')
 df['ReqQty'] = pd.to_numeric(df['ReqQty'], errors='coerce')
 
 # Crear diccionario de agregación dinámicamente

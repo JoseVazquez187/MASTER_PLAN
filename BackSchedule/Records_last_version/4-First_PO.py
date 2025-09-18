@@ -114,14 +114,13 @@ conn_out.commit()
 
 # === Cargar requerimientos desde Expedite ===
 conn = sqlite3.connect(path_exp_db)
-df = pd.read_sql("SELECT ItemNo, ReqDate, ReqQty FROM expedite_parchado", conn)
+df = pd.read_sql("SELECT ItemNo, ReqDate, ReqQty FROM expedite", conn)
 conn.close()
 
 
 
 
-# df['ReqDate'] = pd.to_datetime(df['ReqDate'])
-df['ReqDate'] = pd.to_datetime(df['ReqDate'], errors='coerce')
+df['ReqDate'] = pd.to_datetime(df['ReqDate'])
 # Paso 1: Asegúrate que ReqQty es numérico antes de agrupar
 df['ReqQty'] = pd.to_numeric(df['ReqQty'], errors='coerce')
 
